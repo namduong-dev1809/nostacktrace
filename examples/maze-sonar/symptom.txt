@@ -1,0 +1,1 @@
+My maze robot works in small cells, but in a long corridor it freezes for about a second and then crashes into the wall. The Serial log also pauses.

@@ -1,0 +1,33 @@
+{
+ "summary": "Khi robot đi vào hành lang dài, cảm biến HC-SR04 không nhận được xung phản hồi do vượt tầm đo. Hàm pulseIn() không có timeout sẽ mặc định dừng chương trình chờ tối đa 1 giây, làm Serial log bị hoãn và robot mất kiểm soát dẫn đến đâm vào tường.",
+ "causes": [
+  {
+   "title": "pulseIn() không có timeout làm treo chương trình 1 giây",
+   "category": "code",
+   "likelihood": "high",
+   "why": "Trong hàm readCm(), dòng code long us = pulseIn(ECHO, HIGH); không khai báo tham số timeout nên mặc định chờ 1.000.000 us (1 giây) khi không nhận được xung Echo.",
+   "check": "Hướng cảm biến ra khoảng trống xa (không có vật cản) và quan sát Serial Monitor xem dòng log có bị khựng lại đúng 1 giây không.",
+   "fix": "Thêm giá trị timeout vào pulseIn, ví dụ pulseIn(ECHO, HIGH, 30000) để giới hạn thời gian chờ tối đa khoảng 30 ms (tương đương khoảng cách khoảng 5m).",
+   "source": "rule:pulsein-no-timeout"
+  },
+  {
+   "title": "Dùng nguồn 5V của ESP32 nuôi trực tiếp Servo gây sụt áp",
+   "category": "power",
+   "likelihood": "low",
+   "why": "Sơ đồ nối chân esp:5V -- neck:V+ sử dụng trực tiếp nguồn của vi điều khiển cho Servo. Khi Servo xoay góc lớn, dòng đỉnh có thể gây sụt nguồn tạm thời.",
+   "check": "Theo dõi đèn LED trên board ESP32 xem có bị chớp tắt hoặc kiểm tra Serial Monitor xem board có báo boot/reset lại không.",
+   "fix": "Sử dụng nguồn 5V ngoài riêng cho Servo và nối chung chân GND với ESP32.",
+   "source": "reasoning"
+  }
+ ],
+ "rule_findings": [
+  {
+   "id": "pulsein-no-timeout",
+   "severity": "high",
+   "title": "pulseIn() has no timeout and can freeze loop() for 1 second",
+   "evidence": "pulseIn(pin, level) waits up to 1,000,000 us when no echo returns (object out of range).",
+   "fix": "Pass a timeout: pulseIn(ECHO, HIGH, 30000) caps the wait near 30 ms (about 5 m)."
+  }
+ ],
+ "model": "gemini-3.6-flash"
+}
