@@ -1,0 +1,92 @@
+[
+  {
+    "id": "11-distance-log",
+    "board": "uno",
+    "category": "timing",
+    "root_cause": "The 1000 microsecond pulseIn timeout cannot capture echoes beyond roughly 17 cm.",
+    "fix": "Use a timeout around 30000 microseconds for the sensor 400 cm range.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Start at 100 cm, then set 5 cm; only the short distance produces a reading."
+  },
+  {
+    "id": "12-slow-blink",
+    "board": "uno",
+    "category": "timing",
+    "root_cause": "The ON interval uses delayMicroseconds(1000), lasting 1 ms instead of the intended 1000 ms.",
+    "fix": "Replace delayMicroseconds(1000) with delay(1000).",
+    "wokwi_visible": true,
+    "how_to_see_it": "Watch the LED for five seconds; brief 1 ms pulses are separated by one second."
+  },
+  {
+    "id": "13-lab-counter",
+    "board": "uno",
+    "category": "code",
+    "root_cause": "lcd.clear immediately erases each newly printed count before the one-second display interval.",
+    "fix": "Move lcd.clear before setCursor and print.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Run for several seconds and watch the backlit screen; text is immediately erased."
+  },
+  {
+    "id": "14-arm-indicator",
+    "board": "uno",
+    "category": "part-specific",
+    "root_cause": "On Uno, Servo takes Timer1, which disables normal analogWrite PWM on pins 9 and 10.",
+    "fix": "Move the LED to a PWM pin on another timer, such as D5, and update analogWrite and pinMode.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Start simulation; compare the indicator behavior after moving its PWM output to D5."
+  },
+  {
+    "id": "15-room-climate",
+    "board": "uno",
+    "category": "part-specific",
+    "root_cause": "The DHT library is configured for the DHT11 protocol and byte layout while the connected device is a DHT22.",
+    "fix": "Change the constructor sensor type from DHT11 to DHT22.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Run for at least five seconds with sliders at 24 C and 40 percent; compare the serial values."
+  },
+  {
+    "id": "16-den-ban",
+    "board": "uno",
+    "category": "part-specific",
+    "root_cause": "Uno D4 has no hardware PWM; analogWrite falls back to a binary LOW/HIGH output.",
+    "fix": "Move the LED output wire and both code references to PWM-capable D3, D5, D6, D9, D10, or D11.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Observe a full five-second ramp; the LED jumps at the midpoint instead of fading."
+  },
+  {
+    "id": "17-nut-van",
+    "board": "esp32",
+    "category": "part-specific",
+    "root_cause": "ESP32 analogRead defaults to 12-bit values up to 4095, but the sketch scales with Uno 10-bit full scale 1023.",
+    "fix": "Divide by 4095.0, or explicitly select analogReadResolution(10) before retaining the 1023 divisor.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Rotate the knob from minimum to maximum; reported percentage rises to roughly 400."
+  },
+  {
+    "id": "18-cam-bien-nghieng",
+    "board": "esp32",
+    "category": "part-specific",
+    "root_cause": "MPU6050 AD0 is tied HIGH, selecting I2C address 0x69, while the code communicates with 0x68.",
+    "fix": "Set imuAddress to 0x69, or connect AD0 to ground to use 0x68.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Run and observe repeated not-found messages; the WHO_AM_I register remains 0x68 even at bus address 0x69."
+  },
+  {
+    "id": "19-chuong-bao",
+    "board": "uno",
+    "category": "part-specific",
+    "root_cause": "The Wokwi buzzer is a passive piezo; a constant HIGH voltage cannot create a sustained tone.",
+    "fix": "Use tone(8, 1000) to generate an alternating signal.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Enable simulator audio and run; there is no sustained tone despite the HIGH output."
+  },
+  {
+    "id": "20-dem-lan-bam",
+    "board": "uno",
+    "category": "part-specific",
+    "root_cause": "Uno attachInterrupt external interrupts are supported only on D2 and D3; D4 maps to NOT_AN_INTERRUPT.",
+    "fix": "Move the button signal to D2 or D3 and update pinMode and digitalPinToInterrupt accordingly.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Press and release the button repeatedly; the serial counter remains zero with bouncing disabled."
+  }
+]

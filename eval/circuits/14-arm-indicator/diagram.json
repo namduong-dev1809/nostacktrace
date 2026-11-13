@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-uno",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led",
+      "left": 330,
+      "top": 20,
+      "attrs": {
+        "color": "red"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r",
+      "left": 330,
+      "top": 100,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo",
+      "left": 330,
+      "top": 230,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [
+      "board:10",
+      "r:1",
+      "green",
+      []
+    ],
+    [
+      "r:2",
+      "led:A",
+      "green",
+      []
+    ],
+    [
+      "led:C",
+      "board:GND.1",
+      "black",
+      []
+    ],
+    [
+      "servo:PWM",
+      "board:9",
+      "green",
+      []
+    ],
+    [
+      "servo:V+",
+      "board:5V",
+      "red",
+      []
+    ],
+    [
+      "servo:GND",
+      "board:GND.1",
+      "black",
+      []
+    ]
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-mpu6050",
+      "id": "imu",
+      "left": 330,
+      "top": 20,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [
+      "imu:VCC",
+      "board:3V3",
+      "red",
+      []
+    ],
+    [
+      "imu:GND",
+      "board:GND.1",
+      "black",
+      []
+    ],
+    [
+      "imu:SDA",
+      "board:21",
+      "green",
+      []
+    ],
+    [
+      "imu:SCL",
+      "board:22",
+      "green",
+      []
+    ],
+    [
+      "imu:AD0",
+      "board:3V3",
+      "red",
+      []
+    ],
+    [
+      "board:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "board:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ]
+  ]
+}

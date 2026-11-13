@@ -23,14 +23,16 @@ def _board(parts):
     return None, None
 
 
-def norm_pin(pin, board):
+def norm_pin(pin, board, board_type=""):
     """Board pin name -> canonical form shared by diagram and code ("13", "A0", "GND")."""
     pin = pin.upper()
     if pin.startswith("GND"):
         return "GND"
     if board == "esp32":
         pin = {"VP": "36", "VN": "39"}.get(pin, pin)
-        pin = re.sub(r"^(GPIO|D)(\d+)$", r"\2", pin)
+        # Only the old DevKit V1 labels GPIOs "D2"; on DevKitC V4, D0-D3 are flash pins.
+        prefix = "GPIO|D" if "devkit-v1" in board_type else "GPIO"
+        pin = re.sub(rf"^({prefix})(\d+)$", r"\2", pin)
     return pin
 
 
@@ -39,6 +41,7 @@ class Diagram:
         d = json.loads(text)
         self.parts = {p["id"]: p for p in d.get("parts", [])}
         self.board_id, self.board = _board(d.get("parts", []))
+        self.board_type = self.parts[self.board_id]["type"] if self.board_id else ""
         self._parent = {}
         for conn in d.get("connections", []):
             self._union(conn[0], conn[1])
@@ -78,13 +81,13 @@ class Diagram:
 
     def board_pins(self, net):
         """Canonical board pins in a net."""
-        return {norm_pin(e.split(":", 1)[1], self.board) for e in net
+        return {norm_pin(e.split(":", 1)[1], self.board, self.board_type) for e in net
                 if e.split(":", 1)[0] == self.board_id}
 
     def board_net(self, pin):
         for e in list(self._parent):
             pid, p = e.split(":", 1)
-            if pid == self.board_id and norm_pin(p, self.board) == pin:
+            if pid == self.board_id and norm_pin(p, self.board, self.board_type) == pin:
                 return self.net(e)
         return set()
 

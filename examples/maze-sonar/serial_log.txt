@@ -1,0 +1,52 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1156
+load:0x40078000,len:11456
+ho 0 tail 12 room 4
+load:0x40080400,len:2972
+entry 0x400805dc
+NST|start|board=esp32
+NST|t=554|L29|pinMode(5,3)
+NST|t=554|L30|pinMode(18,1)
+NST|setup_done
+4006 ms  TURN RIGHT
+NST|t=706|L12|digitalWrite(5,0)
+NST|t=706|L14|digitalWrite(5,1)
+NST|t=706|L16|digitalWrite(5,0)
+NST|t=1706|L17|pulseIn(18)=0|took_us=1000018
+NST|t=1856|L12|digitalWrite(5,0)
+NST|t=1856|L14|digitalWrite(5,1)
+NST|t=1856|L16|digitalWrite(5,0)
+NST|t=2856|L17|pulseIn(18)=0|took_us=1000018
+NST|t=3006|L12|digitalWrite(5,0)
+NST|t=3006|L14|digitalWrite(5,1)
+NST|t=3006|L16|digitalWrite(5,0)
+NST|t=4006|L17|pulseIn(18)=0|took_us=1000018
+NST|t=4038|loop_slowest_us=3450498|loops=1
+7499 ms  TURN RIGHT
+NST|t=4199|L12|digitalWrite(5,0)
+NST|t=4199|L14|digitalWrite(5,1)
+NST|t=4199|L16|digitalWrite(5,0)
+NST|t=5199|L17|pulseIn(18)=0|took_us=1000022
+NST|t=6349|L17|pulseIn(18)=0|took_us=1000018
+NST|t=7499|L17|pulseIn(18)=0|took_us=1000018
+10965 ms  TURN RIGHT
+NST|t=8665|L17|pulseIn(18)=0|took_us=1000018
+NST|t=8815|L12|digitalWrite(5,0)
+NST|t=8815|L14|digitalWrite(5,1)
+NST|t=8815|L16|digitalWrite(5,0)
+NST|t=9815|L17|pulseIn(18)=0|took_us=1000022
+NST|t=10965|L17|pulseIn(18)=0|took_us=1000017
+14431 ms  TURN RIGHT
+NST|t=12131|L17|pulseIn(18)=0|took_us=1000017
+NST|t=13281|L17|pulseIn(18)=0|took_us=1000018
+NST|t=14431|L17|pulseIn(18)=0|took_us=1000018
+17895 ms  TURN RIGHT
+NST|t=15595|L17|pulseIn(18)=0|took_us=1000017
+NST|t=16745|L17|pulseIn(18)=0|took_us=1000017
+NST|t=17895|L17|pulseIn(18)=0|took_us=1000018
+NST|t=17909|loop_slowest_us=3450528|loops=5

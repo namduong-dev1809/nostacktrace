@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot",
+      "left": 330,
+      "top": 220,
+      "attrs": {
+        "value": "512"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "pot:VCC",
+      "board:3V3",
+      "red",
+      []
+    ],
+    [
+      "pot:GND",
+      "board:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pot:SIG",
+      "board:34",
+      "green",
+      []
+    ],
+    [
+      "board:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "board:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ]
+  ]
+}

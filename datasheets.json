@@ -1,0 +1,152 @@
+{
+  "esp32_input_only": {
+    "part": "ESP32",
+    "fact": "GPIO34-39 are input-only: no output driver and no internal pull-up/pull-down.",
+    "source": "Espressif ESP32 Series Datasheet v5.3",
+    "url": "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+    "page": 61,
+    "quote": "GPIO pins 34-39 are input-only. These pins do not feature an output driver",
+    "verified": true,
+    "also": {
+      "page": 17,
+      "quote": "Input only pins, output is not supported due to lack of pull-up/pull-down resistors."
+    }
+  },
+  "esp32_adc2_wifi": {
+    "part": "ESP32",
+    "fact": "ADC2 is shared with Wi-Fi. In ESP-IDF v4.4 legacy driver, adc2_get_raw() always fails with ESP_ERR_TIMEOUT once Wi-Fi is started. Current IDF oneshot driver arbitrates and adc_oneshot_read() may return ESP_ERR_TIMEOUT.",
+    "source": "ESP-IDF Programming Guide, ADC (v4.4) and ADC Oneshot Mode Driver (stable)",
+    "url": "https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/api-reference/peripherals/adc.html",
+    "page": null,
+    "page_note": "Web docs, no page. Not stated in the ESP32 datasheet text.",
+    "quote": "If Wi-Fi is started via esp_wifi_start(), this function will always fail",
+    "verified": true,
+    "also": {
+      "url": "https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/adc/adc_oneshot.html",
+      "quote": "ADC2 is also used by Wi-Fi."
+    }
+  },
+  "esp32_strapping_pins": {
+    "part": "ESP32",
+    "fact": "Strapping pins GPIO0, GPIO2 (boot mode), MTDI=GPIO12 (VDD_SDIO voltage), MTDO=GPIO15 (U0TXD printing, SDIO timing), GPIO5 (SDIO timing) are latched at reset. Defaults: GPIO0 pull-up, GPIO2 pull-down, MTDI pull-down, MTDO pull-up, GPIO5 pull-up.",
+    "source": "Espressif ESP32 Series Datasheet v5.3",
+    "url": "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+    "page": 22,
+    "quote": "Chip boot mode – Strapping pin: GPIO0 and GPIO2",
+    "verified": true,
+    "also": {
+      "page": 14,
+      "note": "Pin table maps MTDI=GPIO12, MTDO=GPIO15; page 23 Table 3-3 Chip Boot Mode Control."
+    }
+  },
+  "atmega328p_pin_current": {
+    "part": "ATmega328P",
+    "fact": "Absolute max DC current per I/O pin is 40.0 mA; DC characteristics are specified at test condition IOL/IOH = 20 mA at VCC = 5 V (10 mA at 3 V).",
+    "source": "Microchip ATmega48A/PA/88A/PA/168A/PA/328/P Data Sheet DS40002061B (2020)",
+    "url": "https://ww1.microchip.com/downloads/aemDocuments/documents/MCU08/ProductDocuments/DataSheets/ATmega48A-PA-88A-PA-168A-PA-328-P-DS-DS40002061B.pdf",
+    "page": 308,
+    "quote": "DC Current per I/O Pin . . . 40.0mA",
+    "verified": true,
+    "also": {
+      "page": 323,
+      "quote": "sink more than the test conditions (20mA at VCC = 5V, 10mA at VCC = 3V)",
+      "note": "20 mA test condition found in Table 30-1 (TA -40 to 105 C), pages 322-323; the 40 mA rating also appears on page 322. Ch.29 (-40 to 85 C) common DC table text not extracted."
+    }
+  },
+  "hcsr04_specs": {
+    "part": "HC-SR04",
+    "fact": "Range 2 cm-400 cm; trigger is a 10 us high pulse; use over 60 ms measurement cycle.",
+    "source": "ElecFreaks HC-SR04 Ultrasonic Ranging Module sheet (SparkFun-hosted), 3 pages",
+    "url": "https://cdn.sparkfun.com/datasheets/Sensors/Proximity/HCSR04.pdf",
+    "page": 1,
+    "quote": "HC - SR04 provides 2cm - 400cm non-contact measurement function",
+    "verified": true,
+    "also": {
+      "page": 2,
+      "quote": "we suggest to use over 60ms measurement cycle",
+      "note": "Page 1 also: 'Trigger Input Signal 10uS TTL pulse'. PDF page index; sheet has no printed page numbers."
+    }
+  },
+  "dht22_sampling_period": {
+    "part": "DHT22/AM2302",
+    "fact": "Sensing period average 2 s; collecting period should be > 2 s between reads.",
+    "source": "Aosong DHT22 (AM2302) datasheet (SparkFun-hosted)",
+    "url": "https://www.sparkfun.com/datasheets/Sensors/Temperature/DHT22.pdf",
+    "page": 9,
+    "quote": "Collecting period should be : >2 second.",
+    "verified": true,
+    "also": {
+      "page": 2,
+      "quote": "Sensing period Average: 2s"
+    }
+  },
+  "dht22_pullup": {
+    "part": "DHT22/AM2302",
+    "fact": "Data line needs a pull-up to VDD. The AM2302 sheet's connection diagram shows a 1K pull-up (value appears only inside the diagram image, not in text). The SparkFun DHT22 sheet's diagram (p5) is cropped and shows no resistor value.",
+    "source": "Aosong AM2302 datasheet (Adafruit-hosted), 5 pages",
+    "url": "https://cdn-shop.adafruit.com/datasheets/Digital+humidity+and+temperature+sensor+AM2302.pdf",
+    "page": 2,
+    "quote": "1K (label on pull-up resistor in '5. Electrical connection diagram')",
+    "verified": true,
+    "page_note": "Confirmed visually by rendering page 2; common 4.7k-10k advice is NOT in either sheet."
+  },
+  "mpu6050_i2c_addr": {
+    "part": "MPU-6050",
+    "fact": "7-bit I2C address b110100X: 0x68 when AD0 low, 0x69 when AD0 high.",
+    "source": "InvenSense MPU-6000/MPU-6050 Product Specification PS-MPU-6000A-00 Rev 3.1 (SparkFun mirror; TDK URL returned HTML)",
+    "url": "https://cdn.sparkfun.com/datasheets/Components/General%20IC/PS-MPU-6000A.pdf",
+    "page": 36,
+    "quote": "the address of the one of the devices should be b1101000 (pin AD0 is logic",
+    "verified": true,
+    "also": {
+      "page": 15,
+      "quote": "I2C ADDRESS AD0 = 0 1101000 / AD0 = 1 1101001",
+      "note": "Hex conversion (0x68/0x69) is derived; datasheet gives binary."
+    }
+  },
+  "pcf8574_vs_a_addr": {
+    "part": "PCF8574 / PCF8574A",
+    "fact": "PCF8574 address 0100 A2A1A0 = 0x20-0x27; PCF8574A address 0111 A2A1A0 = 0x38-0x3F. LCD1602 backpacks with A2-A0 pulled high default to 0x27 (PCF8574) or 0x3F (PCF8574A).",
+    "source": "TI PCF8574 datasheet SCPS068K (rev. Sept 2024); TI PCF8574A datasheet SCPS069H (rev. Sept 2024)",
+    "url": "https://www.ti.com/lit/ds/symlink/pcf8574.pdf",
+    "page": 13,
+    "quote": "I2C target address L H L L A2 A1 A0 R/W",
+    "verified": true,
+    "also": {
+      "url": "https://www.ti.com/lit/ds/symlink/pcf8574a.pdf",
+      "page": 10,
+      "quote": "S 0 1 1 1 A2 A1 A0 (Figure 6-3, I2C Write Voltage Waveforms)",
+      "note": "PCF8574 sheet p10 shows 'S 0 1 0 0 A2 A1 A0'. Hex ranges and 0x27/0x3F backpack defaults are derived, not printed. NXP combined PCF8574/74A PDF could not be downloaded (returned HTML)."
+    }
+  },
+  "sg90_pwm": {
+    "part": "SG90",
+    "fact": "Pulse cycle about 20 ms (= 50 Hz); ~1 ms to ~2 ms pulse (1.5 ms middle); operating voltage 4.8-6.0 V.",
+    "source": "SG90 datasheet compilation (friendlywire.com, 7 pages: TowerPro-style sheet + vendor spec pages)",
+    "url": "https://www.friendlywire.com/projects/ne555-servo-safe/SG90-datasheet.pdf",
+    "page": 2,
+    "quote": "Pulse Cycle: ca. 20 ms",
+    "verified": true,
+    "also": {
+      "pages": {
+        "1": "Position \"0\" (1.5 ms pulse) is middle, \"90\" (~2ms pulse)",
+        "4": "OPERATING VOLTAGE: 4.8V~6.0V"
+      },
+      "note": "'50 Hz' not printed in text; derived from 20 ms. Page 2 lists pulse width 500-2400 us; page 1 says 4.8 V (~5V). Imperial College copy of the classic TowerPro sheet timed out."
+    }
+  },
+  "arduino_pulsein_timeout": {
+    "part": "Arduino pulseIn()",
+    "fact": "Optional timeout is in microseconds; default is one second. Returns 0 on timeout.",
+    "source": "Arduino Language Reference: pulseIn() (verified from reference-en source pulseIn.adoc)",
+    "url": "https://docs.arduino.cc/language-reference/en/functions/advanced-io/pulseIn/",
+    "page": null,
+    "page_note": "Web page, no page number. Text read from https://raw.githubusercontent.com/arduino/reference-en/master/Language/Functions/Advanced%20IO/pulseIn.adoc because docs page is client-rendered.",
+    "quote": "the number of microseconds to wait for the pulse to start; default is one second.",
+    "verified": true
+  },
+  "_meta": {
+    "page_convention": "page = 1-based PDF page index. Checked equal to printed page for ESP32 (footer), ATmega (DS40002061B-page N), MPU (N of 57), TI (footer), DHT22 SparkFun p5. HC-SR04, AM2302 and SG90 compilation use PDF index.",
+    "retrieved": "2026-11-13"
+  }
+}

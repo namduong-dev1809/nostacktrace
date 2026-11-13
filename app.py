@@ -15,8 +15,9 @@ if (ROOT / ".env").exists():
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip().strip('"'))
 
-from checks import run_checks  # noqa: E402
-from diagnose import MODEL, diagnose  # noqa: E402
+from checks import Diagram, run_checks  # noqa: E402
+from nst_trace import check_trace, instrument, parse_log  # noqa: E402
+from diagnose import DATASHEETS, MODEL, diagnose  # noqa: E402
 
 CACHE = ROOT / "cache"
 EXAMPLES = {p.name: p for p in sorted((ROOT / "examples").iterdir()) if p.is_dir()}
@@ -60,6 +61,7 @@ footer { display: none !important; }
 .nst-low { color: var(--nst-low); background: var(--nst-low-bg); }
 .nst-rule { color: var(--nst-ok); background: var(--nst-ok-bg); }
 .nst-cat { color: var(--nst-muted); background: var(--nst-low-bg); }
+.nst-badge a { color: inherit; text-decoration: underline dotted; }
 .nst-rows { margin: 12px 0 0 40px; display: grid; gap: 8px; }
 .nst-row { color: var(--nst-text); line-height: 1.55; font-size: 14.5px; }
 .nst-row span { display: inline-block; min-width: 52px; font-weight: 650; color: var(--nst-muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; }
@@ -88,6 +90,17 @@ def _fmt(text):
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", html.escape(str(text)))
 
 
+def source_label(source):
+    kind, _, key = source.partition(":")
+    if kind == "rule" and key.startswith("trace-"):
+        return "Seen in runtime trace"
+    fact = DATASHEETS.get(key) if kind == "datasheet" else None
+    if not fact:
+        return SOURCE_LABEL.get(kind, _fmt(kind))
+    where = f"p.{fact['page']}" if fact.get("page") else "docs"
+    return f'<a href="{html.escape(fact["url"])}" target="_blank" rel="noopener">Datasheet · {_fmt(fact["part"])} {where}</a>'
+
+
 def render(result, note=""):
     out = []
     if result.get("summary"):
@@ -105,7 +118,7 @@ def render(result, note=""):
             f'<div class="nst-title">{_fmt(c["title"])}</div><div class="nst-badges">'
             f'<span class="nst-badge nst-{lk}">{lk} likelihood</span>'
             f'<span class="nst-badge nst-cat">{_fmt(c["category"])}</span>'
-            f'<span class="nst-badge {"nst-rule" if kind == "rule" else "nst-cat"}">{SOURCE_LABEL.get(kind, _fmt(kind))}</span>'
+            f'<span class="nst-badge {"nst-rule" if kind == "rule" else "nst-cat"}">{source_label(c["source"])}</span>'
             f'</div></div></div><div class="nst-rows">{rows}</div></div>')
     if not cards and not note:
         out.append('<div class="nst-empty"><b>No likely cause found</b>Add more detail to the symptom, or check the wiring tab.</div>')
@@ -120,23 +133,46 @@ def notice(text):
     return f'<div class="nst-note">{_fmt(text)}</div>'
 
 
-def run(sketch, diagram, pin_table, symptom, lang, mode):
+def make_trace(sketch, diagram, mode):
+    if not sketch.strip():
+        return "", notice_md("Paste your code first.")
+    board = "uno"
+    if mode == "wokwi" and diagram.strip():
+        try:
+            board = Diagram(diagram).board or "uno"
+        except ValueError:
+            pass
+    try:
+        traced, baud = instrument(sketch, board)
+    except ValueError as e:
+        return "", notice_md(str(e))
+    return traced, (f"**Run this traced copy** in Wokwi or on your board for about 10 seconds, reproduce the problem, "
+                    f"then copy everything from the Serial Monitor (baud **{baud}**) into the box below. "
+                    "Your original line numbers are kept.")
+
+
+def notice_md(text):
+    return f"**{text}**"
+
+
+def run(sketch, diagram, pin_table, symptom, lang, mode, serial_log=""):
     if not sketch.strip() or not symptom.strip():
         return notice("Describe what you see and paste your code first.")
     if mode == "wokwi" and not diagram.strip():
         return notice("Paste diagram.json, or switch to the Real hardware tab.")
     if mode != "wokwi":
         diagram = ""
-    key = hashlib.sha256(json.dumps([sketch, diagram, pin_table, symptom, lang, MODEL]).encode()).hexdigest()[:16]
+    key = hashlib.sha256(json.dumps([sketch, diagram, pin_table, symptom, lang, MODEL] + ([serial_log] if serial_log.strip() else [])).encode()).hexdigest()[:16]
     cached = CACHE / f"{key}.json"
     if cached.exists():
         return render(json.loads(cached.read_text()))
     try:
-        result = diagnose(sketch, diagram, pin_table, symptom, LANGS[lang])
+        result = diagnose(sketch, diagram, pin_table, symptom, LANGS[lang], serial_log)
     except ValueError as e:  # bad diagram.json
         return notice(f"Could not read diagram.json: {e}")
     except Exception as e:  # Gemini down or out of quota: still show what the code checks found
-        findings = run_checks(sketch, diagram) if diagram else []
+        findings = (run_checks(sketch, diagram) if diagram else []) + (
+            check_trace(parse_log(serial_log), sketch) if serial_log.strip() else [])
         return render({"rule_findings": findings},
                       f"AI explanation unavailable right now ({type(e).__name__}). Showing code-check results only.")
     CACHE.mkdir(exist_ok=True)
@@ -151,7 +187,9 @@ def example_title(p):
 
 def load_example(name):
     p = EXAMPLES[name]
-    return [*((p / f).read_text() for f in ("symptom.txt", "sketch.ino", "diagram.json")), gr.Tabs(selected="wokwi"), "wokwi", EMPTY]
+    log = p / "serial_log.txt"
+    return [*((p / f).read_text() for f in ("symptom.txt", "sketch.ino", "diagram.json")), gr.Tabs(selected="wokwi"), "wokwi",
+            log.read_text() if log.exists() else "", EMPTY]
 
 
 THEME = gr.themes.Soft(primary_hue="indigo", neutral_hue="slate", radius_size="lg",
@@ -188,6 +226,15 @@ with gr.Blocks(title="NoStackTrace") as demo:
                                            placeholder="One wire per line:\nGPIO5 -> HC-SR04 TRIG\nGPIO18 -> HC-SR04 ECHO\n5V -> HC-SR04 VCC\nGND -> HC-SR04 GND")
             t1.select(lambda: "wokwi", None, mode)
             t2.select(lambda: "real", None, mode)
+            gr.HTML('<div class="nst-step">4 · Trace it <span class="nst-pill">recommended</span></div>', padding=False)
+            with gr.Accordion("See what really happens when your code runs", open=False):
+                gr.Markdown("Reading code only lets AI guess. A trace records every pin read/write, "
+                            "`pulseIn()` duration, I2C scan and the slowest `loop()` while your sketch runs.")
+                trace_btn = gr.Button("1. Make a traced copy of my sketch", size="sm")
+                trace_help = gr.Markdown()
+                traced = gr.Code(show_label=False, language="cpp", lines=6, max_lines=12, interactive=False)
+                serial_log = gr.Textbox(label="2. Paste the Serial Monitor output here", lines=5,
+                                        placeholder="NST|start|board=esp32\nNST|t=1052|L17|pulseIn(18)=0|took_us=1000214\n...")
             with gr.Row():
                 clear = gr.Button("Clear", variant="secondary", scale=1)
                 go = gr.Button("Find the bug", variant="primary", scale=3)
@@ -196,10 +243,12 @@ with gr.Blocks(title="NoStackTrace") as demo:
             out = gr.HTML(EMPTY)
 
     for name, btn in ex_buttons.items():
-        btn.click(lambda n=name: load_example(n), None, [symptom, sketch, diagram, tabs, mode, out])
-    go.click(run, [sketch, diagram, pin_table, symptom, lang, mode], out).then(
+        btn.click(lambda n=name: load_example(n), None, [symptom, sketch, diagram, tabs, mode, serial_log, out])
+    trace_btn.click(make_trace, [sketch, diagram, mode], [traced, trace_help])
+    go.click(run, [sketch, diagram, pin_table, symptom, lang, mode, serial_log], out).then(
         None, None, None, js="() => { if (innerWidth < 900) document.getElementById('nst-result').scrollIntoView({behavior: 'smooth'}); }")
-    clear.click(lambda: ["", "", "", "", EMPTY], None, [symptom, sketch, diagram, pin_table, out])
+    clear.click(lambda: ["", "", "", "", "", "", "", EMPTY], None,
+                [symptom, sketch, diagram, pin_table, traced, trace_help, serial_log, out])
 
 if __name__ == "__main__":
     demo.launch(theme=THEME, css=CSS, footer_links=[],

@@ -1,0 +1,358 @@
+{
+ "01-status-lamp": {
+  "model": "gemini-3.6-flash",
+  "category": "wiring",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies the pin mismatch between D9 in the code and D8 in the wiring as its primary diagnosis."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately identifies the pin mismatch between D8 and D9 as the main cause and provides both correct resolution options."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The LED does not blink because the sketch controls pin 9 while the resistor and LED circuit are wired to pin 8.",
+   "causes": [
+    {
+     "title": "Pin mismatch between code and wiring",
+     "category": "code",
+     "likelihood": "high",
+     "why": "The sketch defines `const int lamp = 9;` and outputs to pin 9, but the physical resistor wire is connected to `board:8`.",
+     "check": "Check if the wire is plugged into digital pin 8 while the sketch references `const int lamp = 9;`.",
+     "fix": "Change `const int lamp = 9;` to `const int lamp = 8;` in the sketch, or move the wire from pin 8 to pin 9 on the Arduino board.",
+     "source": "rule:pin-not-wired"
+    }
+   ],
+   "rule_findings": [
+    {
+     "id": "pin-not-wired",
+     "severity": "high",
+     "title": "Pin 9 is used in code but nothing is wired to it",
+     "evidence": "The code uses pin 9; in diagram.json no part connects to that pin.",
+     "fix": "Check that the pin number in the code matches the wire, or move the wire."
+    }
+   ],
+   "model": "gemini-3.6-flash"
+  },
+  "baseline": "### What is wrong\n\nThere is a **pin mismatch** between your Arduino code and your circuit diagram:\n\n* In **`sketch.ino`**, your code controls pin **9** (`const int lamp = 9;`).\n* In **`diagram.json`**, the resistor/LED wire is connected to pin **8** (`\"board:8\"`).\n\nBecause pin 9 has nothing connected to it, the LED never lights up.\n\n---\n\n### How to fix it\n\nYou can fix this in one of two ways:\n\n#### Option 1: Fix the code (Recommended)\nChange pin `9` to pin `8` in `sketch.ino`:\n\n```cpp\nconst int lamp = 8; // Changed from 9 to 8\n\nvoid setup() { \n  pinMode(lamp, OUTPUT); \n}\n\nvoid loop() {\n  digitalWrite(lamp, HIGH);\n  delay(500);\n  digitalWrite(lamp, LOW);\n  delay(500);\n}\n```\n\n---\n\n#### Option 2: Fix the wiring diagram\nAlternatively, change the connection in `diagram.json` from pin `8` to pin `9`:\n\n```json\n  \"connections\": [\n    [\n      \"board:9\",  <-- Change from \"board:8\" to \"board:9\"\n      \"r:1\",\n      \"green\",\n      []\n    ],\n    [\n      \"r:2\",\n      \"led:A\",\n      \"green\",\n      []\n    ],\n    [\n      \"led:C\",\n      \"board:GND.1\",\n      \"black\",\n      []\n    ]\n  ]\n```"
+ },
+ "02-door-button": {
+  "model": "gemini-3.6-flash",
+  "category": "wiring",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that GPIO 18 is directly connected/shorted to GND via terminal pair 1 of the pushbutton, causing a constant LOW reading. It also correctly recommends moving GND to the opposite terminal pair (2.l)."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies in its primary diagnosis that pins 1.l and 1.r are internally connected, causing GPIO 18 to be permanently shorted to GND."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The Serial Monitor continuously reports \"Door open\" because GPIO 18 is connected directly to GND in the wiring, forcing the pin permanently LOW regardless of button presses.",
+   "causes": [
+    {
+     "title": "GPIO 18 is directly shorted to GND",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "The wiring net board:18 -- board:GND.1 -- button:1.l (wokwi-pushbutton) connects pin 18 directly to GND, causing digitalRead(buttonPin) to constantly evaluate to LOW.",
+     "check": "Inspect your breadboard wiring to see if the wire from pin 18 goes straight into the GND rail or shares a terminal with GND.",
+     "fix": "Remove the direct connection between board pin 18 and GND. Connect GPIO 18 to one terminal pair of the pushbutton (e.g., 1.l) and GND to the opposite terminal pair (e.g., 2.l).",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.6-flash"
+  },
+  "baseline": "### What is wrong?\n\nIn Wokwi, pins **`1.l`** and **`1.r`** on the push button are internally connected to each other (they represent the same terminal/side of the switch). \n\nBecause your `diagram.json` connects GPIO 18 to `button:1.l` and GND to `button:1.r`, GPIO 18 is permanently shorted directly to GND. This makes `digitalRead(18)` stay `LOW` constantly, printing \"Door open\" whether you press the button or not.\n\n---\n\n### How to fix it\n\nConnect the GND wire to **`button:2.r`** (or `button:2.l`) instead of `button:1.r`. \n\nUpdate your `diagram.json` connections section like this:\n\n```json\n  \"connections\": [\n    [\n      \"board:18\",\n      \"button:1.l\",\n      \"green\",\n      []\n    ],\n    [\n      \"button:2.r\",\n      \"board:GND.1\",\n      \"black\",\n      []\n    ],\n    [\n      \"board:TX\",\n      \"$serialMonitor:RX\",\n      \"\",\n      []\n    ],\n    [\n      \"board:RX\",\n      \"$serialMonitor:TX\",\n      \"\",\n      []\n    ]\n  ]\n```\n\nNow, GPIO 18 will stay `HIGH` (via `INPUT_PULLUP`) printing **\"Door shut\"**, and will drop to `LOW` printing **\"Door open\"** only when you press the button."
+ },
+ "03-desk-light": {
+  "model": "gemini-3.6-flash",
+  "category": "wiring",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies the reverse-biased LED polarity as the primary issue and provides the correct fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the LED is reverse-biased (connected backwards) as its main diagnosis and provides the exact correct fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The LED remains dark because it is connected in reverse polarity: its Anode (led:A) is wired to GND while its Cathode (led:C) is connected via resistor to Pin 9 (HIGH).",
+   "causes": [
+    {
+     "title": "LED wired in reverse polarity",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "Wiring net board:GND.1 -- led:A connects the LED Anode to ground and led:C -- r:2 connects the Cathode to Pin 9, reverse-biasing the LED when Pin 9 is HIGH.",
+     "check": "Inspect the LED legs/wiring to see if the Anode (led:A) is going to GND instead of Pin 9.",
+     "fix": "Swap the LED connections so that the Anode (led:A) connects to the resistor (r:2) and the Cathode (led:C) connects to GND.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.6-flash"
+  },
+  "baseline": "### The Issue\n\nYour LED is connected **backwards** (reverse-biased). \n\nAn LED (Light Emitting Diode) is directional and only conducts electricity in one direction:\n* **Anode (`A`)**: Positive side (+) — should connect towards the signal pin (Pin 9).\n* **Cathode (`C`)**: Negative side (-) — should connect towards Ground (`GND`).\n\nIn your `diagram.json`:\n* `led:A` (Anode) is connected to `board:GND.1`\n* `led:C` (Cathode) is connected to `r:2` (Pin 9)\n\nBecause the voltage at the Cathode is higher than at the Anode, no current flows, keeping the LED dark.\n\n---\n\n### How to Fix It\n\nSwap the LED pin connections in your `diagram.json` so that:\n* `r:2` connects to `led:A` (Anode)\n* `led:C` (Cathode) connects to `board:GND.1`\n\n#### Updated `diagram.json`:\n\n```json\n{\n  \"version\": 1,\n  \"author\": \"NoStackTrace evaluation\",\n  \"editor\": \"wokwi\",\n  \"parts\": [\n    {\n      \"type\": \"wokwi-arduino-uno\",\n      \"id\": \"board\",\n      \"left\": 0,\n      \"top\": 0,\n      \"attrs\": {}\n    },\n    {\n      \"type\": \"wokwi-led\",\n      \"id\": \"led\",\n      \"left\": 330,\n      \"top\": 20,\n      \"attrs\": {\n        \"color\": \"red\"\n      }\n    },\n    {\n      \"type\": \"wokwi-resistor\",\n      \"id\": \"r\",\n      \"left\": 330,\n      \"top\": 100,\n      \"attrs\": {\n        \"value\": \"220\"\n      }\n    }\n  ],\n  \"connections\": [\n    [\n      \"board:9\",\n      \"r:1\",\n      \"green\",\n      []\n    ],\n    [\n      \"r:2\",\n      \"led:A\",\n      \"green\",\n      []\n    ],\n    [\n      \"led:C\",\n      \"board:GND.1\",\n      \"black\",\n      []\n    ]\n  ]\n}\n```\n\nOnce updated, start the simulation and the red LED will turn on immediately."
+ },
+ "04-parking-distance": {
+  "model": "gemini-3.6-flash",
+  "category": "wiring",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer's first diagnosis correctly identifies that the Trigger and Echo pins/wires are swapped relative to the code."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the TRIG and ECHO pins are swapped between the sketch and the diagram wiring as its primary diagnosis."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The trigger and echo pins are swapped between the code variable assignments and the physical breadboard wiring.",
+   "causes": [
+    {
+     "title": "Swapped Trigger and Echo Pins",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "In code, `const int triggerPin = 6;` and `const int echoPin = 7;`, but the wiring connects `board:7` to `sonar:TRIG` and `board:6` to `sonar:ECHO`.",
+     "check": "Check if pin 7 goes to TRIG and pin 6 goes to ECHO on the HC-SR04 sensor.",
+     "fix": "Change the code to `const int triggerPin = 7;` and `const int echoPin = 6;` (or swap the physical jumper wires on pins 6 and 7).",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.6-flash"
+  },
+  "baseline": "The issue is a **pin mismatch** between your C++ code and your `diagram.json` wiring connections.\n\n### What is wrong:\n* **In your code (`sketch.ino`):**\n  * `triggerPin` is set to **6**\n  * `echoPin` is set to **7**\n* **In your wiring (`diagram.json`):**\n  * `TRIG` is connected to Arduino pin **7**\n  * `ECHO` is connected to Arduino pin **6**\n\nBecause they are swapped, the sensor never receives the trigger pulse and the Arduino is listening for an echo on the wrong pin.\n\n---\n\n### How to fix it:\n\nYou can fix this by changing either your C++ code **or** your `diagram.json`.\n\n#### Option 1: Update `sketch.ino` (Recommended)\nChange lines 1 & 2 to match your existing wiring:\n\n```cpp\nconst int triggerPin = 7;\nconst int echoPin = 6;\n```\n\n#### Option 2: Update `diagram.json`\nSwap pins 6 and 7 in the `connections` section of `diagram.json`:\n\n```json\n    [\n      \"sonar:TRIG\",\n      \"board:6\",\n      \"green\",\n      []\n    ],\n    [\n      \"sonar:ECHO\",\n      \"board:7\",\n      \"green\",\n      []\n    ]\n```"
+ },
+ "05-welcome-display": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "wiring",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The first diagnosis correctly identifies the swapped I2C SDA and SCL connections matching the known root cause."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the SDA and SCL wires are swapped, with SDA connected to A5 and SCL connected to A4 instead of the correct pins."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The LCD is wired incorrectly for standard I2C communication on the Arduino Uno.",
+   "causes": [
+    {
+     "title": "I2C Pins Swapped",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "board:A5 is connected to lcd:SDA and board:A4 is connected to lcd:SCL, but the Arduino Uno's SDA line is on A4 and SCL is on A5.",
+     "check": "Verify the wire from board:A5 goes to lcd:SCL and board:A4 goes to lcd:SDA.",
+     "fix": "Swap the SDA and SCL connections so that A4 connects to SDA and A5 connects to SCL.",
+     "source": "reasoning"
+    },
+    {
+     "title": "Incorrect I2C Address",
+     "category": "code",
+     "likelihood": "medium",
+     "why": "LiquidCrystal_I2C lcd(0x27, 16, 2); uses address 0x27, but the physical LCD module might be configured for 0x3F.",
+     "check": "Run an I2C scanner sketch to confirm the exact address of the LCD module.",
+     "fix": "Change the I2C address in the constructor to match the scanned address, such as 0x3F.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "The issue is that your **SDA and SCL wires are swapped** relative to the standard Arduino Uno I2C pins. \n\n* On the Arduino Uno, **A4 is SDA** and **A5 is SCL**.\n* In your `diagram.json`, you connected `lcd:SDA` to `board:A5` and `lcd:SCL` to `board:A4`.\n\n---\n\n### How to Fix It\n\nYou have two ways to fix this:\n\n#### Option 1: Fix it in `diagram.json` (Recommended)\nOpen your `diagram.json` file and swap the connections for SDA and SCL so they match the correct pins:\n\n```json\n    [\n      \"lcd:SDA\",\n      \"board:A4\",\n      \"green\",\n      []\n    ],\n    [\n      \"lcd:SCL\",\n      \"board:A5\",\n      \"green\",\n      []\n    ]\n```\n\n#### Option 2: Fix it in the Wokwi Visual Editor\n1. Click on the wires connected to the Arduino Uno's A4 and A5 pins.\n2. Delete them.\n3. Reconnect **SDA** from the LCD to pin **A4** on the Uno.\n4. Reconnect **SCL** from the LCD to pin **A5** on the Uno."
+ },
+ "06-knob-monitor": {
+  "model": "gemini-3.1-flash-lite",
+  "category": "wiring",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the analog pin is connected to a supply voltage instead of the potentiometer wiper, which matches the provided root cause."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the GPIO 34 pin was connected to the VCC terminal instead of the SIG/Wiper terminal and provides the correct fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The potentiometer is wired incorrectly, causing the analog pin to float or receive a constant voltage instead of a variable signal.",
+   "causes": [
+    {
+     "title": "Potentiometer wiper not connected to analog pin",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "The wiring shows 'board:34 -- board:3V3', which connects the analog pin directly to 3.3V instead of connecting it to the wiper (middle pin) of the potentiometer.",
+     "check": "Verify that the middle pin of the potentiometer is connected to GPIO 34, and the outer pins are connected to 3V3 and GND.",
+     "fix": "Disconnect the wire between board:34 and board:3V3. Connect the middle pin of the potentiometer to board:34.",
+     "source": "reasoning"
+    },
+    {
+     "title": "Incorrect potentiometer pin mapping",
+     "category": "wiring",
+     "likelihood": "medium",
+     "why": "The wiring list implies the wiper pin is not being utilized, leaving the analog input pin at a constant high voltage level.",
+     "check": "Check the potentiometer datasheet or Wokwi component labels to ensure the middle pin is the wiper.",
+     "fix": "Ensure the middle pin of the potentiometer is connected to GPIO 34.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.1-flash-lite"
+  },
+  "baseline": "The issue is in your `diagram.json` file. You have connected the **VCC** pin of the potentiometer to the **GPIO 34** pin.\n\nIn a potentiometer circuit, the **Wiper** (the middle pin) is the one that sends the variable voltage to the ESP32. Currently, you have the VCC (3.3V) connected to the wiper pin, which is why your reading is stuck at the maximum value (4095).\n\n### How to fix it:\n\n1. Open your `diagram.json` file.\n2. Look for the `connections` section.\n3. Find the line that connects `pot:VCC` to `board:34`.\n4. Change `pot:VCC` to `pot:SIG` (or `pot:WIPER`, depending on the component label).\n\n**Your corrected `connections` section should look like this:**\n\n```json\n  \"connections\": [\n    [ \"pot:VCC\", \"board:3V3\", \"red\", [] ],\n    [ \"pot:GND\", \"board:GND.1\", \"black\", [] ],\n    [ \"pot:SIG\", \"board:34\", \"green\", [] ]  // Changed VCC to SIG\n  ]\n```\n\n### Why this happens:\n*   **VCC:** Always provides 3.3V (Maximum).\n*   **GND:** Always provides 0V.\n*   **SIG (Wiper):** This is the pin that moves between 0V and 3.3V as you turn the knob. By connecting the SIG pin to GPIO 34, the ESP32 can finally \"see\" the voltage change.\n\n**Pro-tip for Wokwi:** If you hover your mouse over the pins of the potentiometer in the Wokwi editor, it will highlight the pin names (VCC, SIG, GND). Always ensure the middle pin (SIG) is the one connected to your analog input pin (34)."
+ },
+ "07-help-button": {
+  "model": "gemini-3.1-flash-lite",
+  "category": "timing",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies the blocking delay as the primary cause and suggests the exact recommended fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies the 5-second delay as the root cause and provides a clear explanation of why it prevents button sampling, along with the correct fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The code uses a long delay in the main loop, which prevents the microcontroller from responding to button presses in real-time.",
+   "causes": [
+    {
+     "title": "Blocking code execution with delay()",
+     "category": "code",
+     "likelihood": "high",
+     "why": "The line 'delay(5000);' forces the ESP32 to pause for 5 seconds every loop, ignoring any button state changes during that time.",
+     "check": "Remove the 'delay(5000);' line and observe if the LED responds immediately to button presses.",
+     "fix": "Remove the delay or use a non-blocking timing approach like 'millis()' to manage the LED state.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.1-flash-lite"
+  },
+  "baseline": "The reason your project is behaving this way is the **`delay(5000);`** line in your `loop()` function.\n\n### The Problem\nIn Arduino programming, `delay()` pauses the entire processor. When your code reaches that line, it stops checking the button for **5 full seconds**. \n\n1. If you press the button while the code is in the middle of that 5-second delay, the ESP32 doesn't \"see\" the press.\n2. If you press the button exactly when the delay finishes, the code reads the state, updates the LED, and then immediately goes back to sleep for another 5 seconds. This is why the LED seems to \"stick\" or react very slowly.\n\n### The Fix\nYou need to remove the `delay()` so that the loop runs as fast as possible. This allows the ESP32 to check the button state thousands of times per second, making it feel \"instant.\"\n\nUpdate your `sketch.ino` to this:\n\n```cpp\nvoid setup() {\n  pinMode(23, OUTPUT);\n  pinMode(18, INPUT_PULLUP);\n}\n\nvoid loop() {\n  // Read the button state and update the LED immediately\n  // No delay here!\n  digitalWrite(23, digitalRead(18) == LOW);\n}\n```\n\n### Why this works:\n*   **Responsiveness:** By removing the delay, the `loop()` function now repeats thousands of times per second. It will catch your button press the exact millisecond it happens.\n*   **Efficiency:** The ESP32 is very fast. It doesn't need a \"rest\" between checks. \n\n**Pro-tip for the future:** If you ever *do* need to use delays (e.g., to make something blink), look up the **\"Blink Without Delay\"** example in the Arduino IDE. It uses the `millis()` function to track time without stopping the processor, which is the standard way to write professional-grade Arduino code."
+ },
+ "08-heartbeat": {
+  "model": "gemini-3.1-flash-lite",
+  "category": "code",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the unconditional assignment of lastBlink at the start of the loop prevents the elapsed time from accumulating and provides the correct fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that resetting lastBlink at the start of the loop prevents the elapsed time from accumulating, and provides the correct fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The heartbeat LED fails to blink because the logic inside the loop function resets the timer variable every iteration, preventing the elapsed time from ever reaching the 500ms threshold.",
+   "causes": [
+    {
+     "title": "Logic error in timing loop",
+     "category": "code",
+     "likelihood": "high",
+     "why": "The line 'lastBlink = millis();' at the start of the loop resets the reference time to the current time on every iteration, so 'millis() - lastBlink' will always be near zero.",
+     "check": "Add a Serial.print(millis() - lastBlink) inside the loop to observe the value.",
+     "fix": "Move 'lastBlink = millis();' inside the 'if' block so it only updates after a successful toggle.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.1-flash-lite"
+  },
+  "baseline": "The issue is in your `loop()` function logic. You are resetting `lastBlink` to the current time at the very beginning of **every single iteration** of the loop.\n\n### The Problem\nBecause `loop()` runs thousands of times per second, your code effectively does this:\n1. `lastBlink = millis();` (Sets the timestamp to \"now\")\n2. `if (millis() - lastBlink >= 500)` (Checks if 500ms have passed since \"now\")\n\nSince the time difference between the first line and the second line is effectively zero, the condition `if` will **never** be true. The code inside the `if` block never executes, so the LED never toggles.\n\n### The Fix\nYou need to move the `lastBlink = millis();` line **inside** the `if` block. This way, you only update the timestamp when the blink actually happens.\n\nHere is the corrected `sketch.ino`:\n\n```cpp\nunsigned long lastBlink = 0;\nbool lit = false;\n\nvoid setup() { \n  pinMode(9, OUTPUT); \n}\n\nvoid loop() {\n  // Only check the time; don't reset lastBlink here!\n  if (millis() - lastBlink >= 500) {\n    lit = !lit;\n    digitalWrite(9, lit);\n    \n    // Update the timestamp ONLY after the blink occurs\n    lastBlink = millis();\n  }\n}\n```\n\n### Why this works:\n*   **Initial state:** `lastBlink` is 0.\n*   **First run:** `millis()` is (for example) 505. `505 - 0` is greater than 500. The `if` block runs, the LED turns on, and `lastBlink` is updated to 505.\n*   **Next runs:** The code checks `millis() - 505`. It will keep returning `false` until `millis()` reaches 1005, at which point it triggers again and resets `lastBlink` to 1005."
+ },
+ "09-knob-percentage": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "code",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that integer division is used before assignment, discarding fractional values, and proposes using a float division fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies integer division truncating the fractional value as the primary root cause and provides the correct fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "Integer division truncates the result to zero in the percentage calculation, causing the value to remain 0 until raw is at its maximum.",
+   "causes": [
+    {
+     "title": "Integer Division Truncation",
+     "category": "code",
+     "likelihood": "high",
+     "why": "float percent = (raw / 1023) * 100;",
+     "check": "Print the raw value using Serial.println(raw) to verify it changes across the potentiometer's range.",
+     "fix": "Change the divisor or numerator to float by writing (raw / 1023.0) * 100.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "The issue is caused by **integer division** in your C++ code. \n\n### Why it happens:\nIn your code:\n```cpp\nfloat percent = (raw / 1023) * 100;\n```\nBoth `raw` and `1023` are integers. When you divide an integer by a larger integer (like `raw` being anything from 0 to 1022), C++ performs integer division and truncates the decimal part, resulting in `0`. \n\nIt only becomes `100` at the very end when `raw` equals `1023` (`1023 / 1023 = 1`, and `1 * 100 = 100`).\n\n---\n\n### How to fix it:\nYou need to force C++ to do floating-point math by making at least one of the numbers a float (e.g., changing `1023` to `1023.0`):\n\nChange this line:\n```cpp\nfloat percent = (raw / 1023.0) * 100;\n```\n\n### Alternatively (using the `map` function):\nArduino has a built-in `map()` function that is very useful for this, though it uses integers. If you want a smooth percentage using floats, the fix above is best. If you just want an integer percentage (0 to 100), you can do:\n\n```cpp\nvoid setup() { Serial.begin(115200); }\nvoid loop() {\n  int raw = analogRead(A0);\n  int percent = map(raw, 0, 1023, 0, 100);\n  Serial.print(\"Percent: \");\n  Serial.println(percent);\n  delay(200);\n}\n```"
+ },
+ "10-toggle-lamp": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "code",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the code toggles continuously while the button is LOW rather than reacting to the edge transition, which matches the root cause."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the sketch toggles repeatedly while the button is held down due to checking the level rather than the transition, aligning with the known root cause."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The button lacks debouncing and triggers multiple state toggles rapidly while held, causing the flashing behavior.",
+   "causes": [
+    {
+     "title": "Missing Button Debouncing",
+     "category": "code",
+     "likelihood": "high",
+     "why": "In loop(), the line `if (digitalRead(18) == LOW)` toggles the lamp state every 100ms without filtering mechanical bounce or waiting for the button to be released.",
+     "check": "Add a Serial.println inside the button check to see how many times it triggers during a single press.",
+     "fix": "Implement edge detection or a debounce delay so the state only toggles once per full press-and-release cycle.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "The issue you are experiencing is caused by **lack of button debouncing** combined with the loop speed. \n\n### What is happening?\n1. When you press the button, the code sees `LOW`, toggles the lamp state, and waits `100ms`.\n2. Humans take around 50ms to 200ms to release a button. Because you hold the button down for longer than 100ms, the `loop()` runs a second time while your finger is still on the button.\n3. It sees `LOW` *again*, toggles the lamp state *again*, and waits another 100ms. This causes the rapid flashing (\"toggle frenzy\") while held, leaving the lamp in a random state when you finally let go.\n\n---\n\n### How to Fix It\n\nTo make one click toggle the lamp properly, you need to detect the **transition** of the button (when it *first* goes from unpressed to pressed) rather than just checking if it is currently held down.\n\nReplace your `sketch.ino` with this debounced version:\n\n```cpp\nbool lampOn = false;\nbool lastButtonState = HIGH; // Remember the previous state\n\nvoid setup() {\n  pinMode(23, OUTPUT);\n  pinMode(18, INPUT_PULLUP);\n}\n\nvoid loop() {\n  bool currentButtonState = digitalRead(18);\n\n  // Check if the button was just pressed (transition from HIGH to LOW)\n  if (lastButtonState == HIGH && currentButtonState == LOW) {\n    lampOn = !lampOn;             // Toggle state\n    digitalWrite(23, lampOn);     // Update LED\n    delay(50);                    // Simple debounce delay\n  }\n\n  // Save the current state for the next loop\n  lastButtonState = currentButtonState;\n}\n```\n\n### Why this works:\n* `lastButtonState` tracks whether the button was already pressed in the previous loop.\n* The code only triggers the toggle **once** the exact moment the button is pressed (`HIGH` to `LOW`). \n* Holding the button down does nothing further because `lastButtonState` will already be `LOW` on the subsequent loops."
+ }
+}

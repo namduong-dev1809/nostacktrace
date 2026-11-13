@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-uno",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "button",
+      "left": 330,
+      "top": 180,
+      "attrs": {
+        "bounce": "0"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "board:4",
+      "button:1.l",
+      "green",
+      []
+    ],
+    [
+      "button:2.l",
+      "board:GND.1",
+      "black",
+      []
+    ]
+  ]
+}

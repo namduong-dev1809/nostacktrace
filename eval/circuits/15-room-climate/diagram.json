@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-uno",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "sensor",
+      "left": 330,
+      "top": 20,
+      "attrs": {
+        "temperature": "24",
+        "humidity": "40"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "pullup",
+      "left": 450,
+      "top": 80,
+      "attrs": {
+        "value": "10000"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "sensor:VCC",
+      "board:5V",
+      "red",
+      []
+    ],
+    [
+      "sensor:GND",
+      "board:GND.1",
+      "black",
+      []
+    ],
+    [
+      "sensor:SDA",
+      "board:2",
+      "green",
+      []
+    ],
+    [
+      "sensor:SDA",
+      "pullup:1",
+      "green",
+      []
+    ],
+    [
+      "pullup:2",
+      "board:5V",
+      "red",
+      []
+    ]
+  ]
+}

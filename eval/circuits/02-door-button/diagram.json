@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "button",
+      "left": 330,
+      "top": 180,
+      "attrs": {
+        "bounce": "0"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "board:18",
+      "button:1.l",
+      "green",
+      []
+    ],
+    [
+      "button:1.r",
+      "board:GND.1",
+      "black",
+      []
+    ],
+    [
+      "board:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "board:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ]
+  ]
+}

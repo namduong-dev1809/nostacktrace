@@ -1,0 +1,92 @@
+[
+  {
+    "id": "01-status-lamp",
+    "board": "uno",
+    "category": "wiring",
+    "root_cause": "The external LED circuit is connected to D8 while the sketch drives D9.",
+    "fix": "Move the resistor connection to D9, or change lamp to 8.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Start simulation and watch the external LED for several seconds."
+  },
+  {
+    "id": "02-door-button",
+    "board": "esp32",
+    "category": "wiring",
+    "root_cause": "GPIO18 and ground are on the two ends of contact 1, which is permanently connected.",
+    "fix": "Move the ground wire from button:1.r to button:2.l.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Start simulation, release and press the button; the message never changes."
+  },
+  {
+    "id": "03-desk-light",
+    "board": "uno",
+    "category": "wiring",
+    "root_cause": "The LED cathode faces the output and its anode faces ground, reverse-biasing the LED.",
+    "fix": "Connect r:2 to led:A and led:C to ground.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Start simulation and observe that the external LED stays dark."
+  },
+  {
+    "id": "04-parking-distance",
+    "board": "uno",
+    "category": "wiring",
+    "root_cause": "The HC-SR04 TRIG and ECHO wires are crossed relative to the sketch.",
+    "fix": "Connect TRIG to D6 and ECHO to D7.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Run and change sonar distance from 100 cm to 20 cm; no readings appear."
+  },
+  {
+    "id": "05-welcome-display",
+    "board": "uno",
+    "category": "wiring",
+    "root_cause": "The LCD SDA wire goes to Uno A5 and SCL goes to A4, reversing the I2C bus.",
+    "fix": "Connect LCD SDA to A4 and SCL to A5.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Start simulation and check that the expected text never appears."
+  },
+  {
+    "id": "06-knob-monitor",
+    "board": "esp32",
+    "category": "wiring",
+    "root_cause": "The ADC wire is connected to the potentiometer supply terminal instead of its SIG wiper.",
+    "fix": "Move only the GPIO34 wire from pot:VCC to pot:SIG, retaining supply and ground.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Turn the knob across its full travel; GPIO34 keeps reading the supply rail."
+  },
+  {
+    "id": "07-help-button",
+    "board": "esp32",
+    "category": "timing",
+    "root_cause": "A five-second blocking delay prevents the sketch from sampling short button presses.",
+    "fix": "Remove the delay or sample the button frequently using a nonblocking millis schedule.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Tap for 200 ms between the five-second samples; then hold the button for over five seconds."
+  },
+  {
+    "id": "08-heartbeat",
+    "board": "uno",
+    "category": "code",
+    "root_cause": "lastBlink is reset on every loop before elapsed time is checked, so 500 ms never accumulates.",
+    "fix": "Remove the unconditional lastBlink assignment at the start of loop; update it only after a blink.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Run for ten seconds; the LED stays off."
+  },
+  {
+    "id": "09-knob-percentage",
+    "board": "uno",
+    "category": "code",
+    "root_cause": "raw / 1023 uses integer division before assignment to float, discarding every fractional value.",
+    "fix": "Use raw * 100.0 / 1023.0.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Rotate from minimum through midpoint to maximum; observe only 0 and 100."
+  },
+  {
+    "id": "10-toggle-lamp",
+    "board": "esp32",
+    "category": "code",
+    "root_cause": "The sketch toggles repeatedly for the entire LOW level rather than once on the press edge; bounce is disabled.",
+    "fix": "Track the previous button state and toggle only on the HIGH-to-LOW transition.",
+    "wokwi_visible": true,
+    "how_to_see_it": "Hold the button for one second; the LED toggles about ten times."
+  }
+]

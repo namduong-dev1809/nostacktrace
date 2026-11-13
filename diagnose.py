@@ -8,10 +8,14 @@ from google import genai
 from google.genai import errors, types
 
 from checks import Diagram, run_checks
+from nst_trace import check_trace, parse_log, summarize
 
 ROOT = Path(__file__).parent
-# Tried in order; a busy (503) or rate-limited (429) model falls through to the next one.
+# Tried in order; a busy (503), rate-limited (429) or timed-out model falls through to the next one.
+# Gemini first (best answers, ~20 requests/day/model on the free tier), then Groq (~1000/day, 8k tokens/min).
 MODELS = os.environ.get("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite").split(",")
+if os.environ.get("GROQ_API_KEY"):
+    MODELS += ["groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b"]
 MODEL = MODELS[0]
 DATASHEETS = json.loads((ROOT / "datasheets.json").read_text()) if (ROOT / "datasheets.json").exists() else {}
 
@@ -39,9 +43,11 @@ SCHEMA = {
 SYSTEM = """You help beginner students debug Arduino Uno / ESP32 lab circuits.
 Rank the most likely root causes of the symptom, most likely first, at most 4.
 Rules:
-- "Confirmed findings" come from deterministic code checks. Treat them as facts and include each one that can explain the symptom.
+- "Confirmed findings" come from deterministic code checks and from the runtime trace. Treat them as facts and include each one that can explain the symptom.
+- A "Runtime trace" shows what really happened when the student ran the sketch (NST lines: source line, call, value, duration). It outranks guesses from reading the code: quote the trace line you rely on in "why", and drop causes the trace rules out.
 - Only cite a datasheet fact from the "Datasheet facts" list, by its key, as source "datasheet:<key>". Never invent page numbers or specs.
 - source is "rule:<id>" for a confirmed finding, "datasheet:<key>" for a listed fact, or "reasoning" otherwise.
+- When a runtime trace finding (id starting with "trace-") and a code check describe the same cause, merge them into one cause with source "rule:<trace id>": what really happened beats what the code suggests.
 - "check" is one concrete thing the student can do in under 2 minutes to confirm the cause.
 - Quote the exact line or pin from the student's code or wiring in "why".
 - If nothing explains the symptom, say so in summary instead of guessing.
@@ -60,7 +66,7 @@ def _client():
     return _CLIENT
 
 
-def build_prompt(sketch, diagram, pin_table, symptom):
+def build_prompt(sketch, diagram, pin_table, symptom, serial_log=""):
     findings, parts = [], ""
     if diagram.strip():
         findings = run_checks(sketch, diagram)
@@ -68,7 +74,15 @@ def build_prompt(sketch, diagram, pin_table, symptom):
         parts = f"Board: {dg.board}\nWiring nets:\n{dg.summary()}"
     else:
         parts = f"Pin table typed by the student (real hardware):\n{pin_table}"
-    facts = "\n".join(f"- {k}: {v['fact']} ({v['source']}, p.{v['page']})" for k, v in DATASHEETS.items()) or "(none)"
+    facts = "\n".join(f"- {k}: {v['fact']} ({v['source']}, {'p.' + str(v['page']) if v.get('page') else v['url']})"
+                      for k, v in DATASHEETS.items() if not k.startswith("_")) or "(none)"
+    trace = ""
+    if serial_log.strip():
+        events = parse_log(serial_log)
+        findings += check_trace(events, sketch)
+        own = [l for l in serial_log.splitlines() if l.strip() and "NST|" not in l][-20:]
+        trace = (f"\n\nRuntime trace ({len(events)} NST events; line numbers match the code above):\n{summarize(events)}"
+                 + ("\n\nThe sketch's own Serial output (last lines):\n" + "\n".join(own) if own else ""))
     prompt = f"""Symptom: {symptom}
 
 {parts}
@@ -82,26 +96,57 @@ Confirmed findings:
 {json.dumps(findings, indent=1) if findings else "(none)"}
 
 Datasheet facts:
-{facts}"""
+{facts}{trace}"""
     return prompt, findings
 
 
-def diagnose(sketch, diagram="", pin_table="", symptom="", lang="English"):
-    prompt, findings = build_prompt(sketch, diagram, pin_table, symptom)
-    config = types.GenerateContentConfig(
-        system_instruction=SYSTEM.replace("{lang}", lang),
-        response_mime_type="application/json",
-        response_schema=SCHEMA,
-        temperature=0.2,
-    )
-    for i, model in enumerate(MODELS):
+class Retryable(Exception):
+    pass
+
+
+def generate(model, prompt, system=None, schema=None):
+    """One call to one model; returns text. Raises Retryable when the next model should be tried."""
+    if model.startswith("groq:"):
+        body = {"model": model[5:], "temperature": 0.2,
+                "messages": ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]}
+        if schema:
+            body["response_format"] = {"type": "json_schema", "json_schema": {"name": "answer", "schema": schema}}
         try:
-            resp = _client().models.generate_content(model=model, contents=prompt, config=config)
-            break
-        except (errors.ServerError, errors.ClientError, httpx.TimeoutException) as e:
-            if getattr(e, "code", 504) not in (429, 503, 504, 404) or i == len(MODELS) - 1:
+            r = httpx.post("https://api.groq.com/openai/v1/chat/completions", json=body, timeout=40,
+                           headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"})
+        except httpx.TimeoutException as e:
+            raise Retryable(e)
+        if r.status_code == 429 or r.status_code >= 500:
+            raise Retryable(f"groq {r.status_code}")
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+    config = types.GenerateContentConfig(temperature=0.2, system_instruction=system, **(
+        {"response_mime_type": "application/json", "response_schema": schema} if schema else {}))
+    try:
+        return _client().models.generate_content(model=model, contents=prompt, config=config).text
+    except (errors.ServerError, errors.ClientError) as e:
+        if getattr(e, "code", None) in (429, 503, 504, 404):
+            raise Retryable(e)
+        raise
+    except httpx.TimeoutException as e:
+        raise Retryable(e)
+
+
+def generate_any(prompt, system=None, schema=None, models=None):
+    """Try models in order; returns (text, model)."""
+    models = models or MODELS
+    for i, model in enumerate(models):
+        try:
+            return generate(model, prompt, system, schema), model
+        except Retryable:
+            if i == len(models) - 1:
                 raise
-    result = json.loads(resp.text)
+
+
+def diagnose(sketch, diagram="", pin_table="", symptom="", lang="English", serial_log=""):
+    prompt, findings = build_prompt(sketch, diagram, pin_table, symptom, serial_log)
+    text, model = generate_any(prompt, SYSTEM.replace("{lang}", lang), SCHEMA)
+    result = json.loads(text)
     result["rule_findings"] = findings
     result["model"] = model
     return result

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "author": "NoStackTrace evaluation",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-uno",
+      "id": "board",
+      "left": 0,
+      "top": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "sonar",
+      "left": 330,
+      "top": 20,
+      "attrs": {
+        "distance": "100"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "sonar:VCC",
+      "board:5V",
+      "red",
+      []
+    ],
+    [
+      "sonar:GND",
+      "board:GND.1",
+      "black",
+      []
+    ],
+    [
+      "sonar:TRIG",
+      "board:6",
+      "green",
+      []
+    ],
+    [
+      "sonar:ECHO",
+      "board:7",
+      "green",
+      []
+    ]
+  ]
+}
