@@ -1,0 +1,1 @@
+Maze robot freezes, then hits the wall

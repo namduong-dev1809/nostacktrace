@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 
+import httpx
 from google import genai
 from google.genai import errors, types
 
@@ -10,7 +11,7 @@ from checks import Diagram, run_checks
 
 ROOT = Path(__file__).parent
 # Tried in order; a busy (503) or rate-limited (429) model falls through to the next one.
-MODELS = os.environ.get("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash").split(",")
+MODELS = os.environ.get("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite").split(",")
 MODEL = MODELS[0]
 DATASHEETS = json.loads((ROOT / "datasheets.json").read_text()) if (ROOT / "datasheets.json").exists() else {}
 
@@ -53,7 +54,9 @@ _CLIENT = None
 def _client():
     # Keep one client alive: a garbage-collected client closes its HTTP session mid-request.
     global _CLIENT
-    _CLIENT = _CLIENT or genai.Client()  # reads GEMINI_API_KEY from the environment
+    # 25 s per call and no SDK retries: on a busy model we move to the next one instead of backing off.
+    _CLIENT = _CLIENT or genai.Client(http_options=types.HttpOptions(  # reads GEMINI_API_KEY from env
+        timeout=25_000, retry_options=types.HttpRetryOptions(attempts=1)))
     return _CLIENT
 
 
@@ -95,8 +98,8 @@ def diagnose(sketch, diagram="", pin_table="", symptom="", lang="English"):
         try:
             resp = _client().models.generate_content(model=model, contents=prompt, config=config)
             break
-        except (errors.ServerError, errors.ClientError) as e:
-            if getattr(e, "code", None) not in (429, 503, 404) or i == len(MODELS) - 1:
+        except (errors.ServerError, errors.ClientError, httpx.TimeoutException) as e:
+            if getattr(e, "code", 504) not in (429, 503, 504, 404) or i == len(MODELS) - 1:
                 raise
     result = json.loads(resp.text)
     result["rule_findings"] = findings
