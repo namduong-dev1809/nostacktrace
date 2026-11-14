@@ -78,11 +78,14 @@ footer { display: none !important; }
   .nst-hero h1 { font-size: 24px; }
   .nst-rows { margin-left: 0; }
 }
+#nst-trace { overflow-x: hidden; }
+#nst-trace > button { overflow: visible; }
+#nst-trace > button .icon { margin-right: 4px; }
 """
 
 EMPTY = ('<div class="nst-empty"><b>Your diagnosis will appear here</b>'
          'Describe what you see, paste your code and wiring, then press <i>Find the bug</i>.<br>'
-         'No project at hand? Pick an example on the left.</div>')
+         'No project at hand? Try one of the examples.</div>')
 
 
 def _fmt(text):
@@ -227,7 +230,7 @@ with gr.Blocks(title="NoStackTrace") as demo:
             t1.select(lambda: "wokwi", None, mode)
             t2.select(lambda: "real", None, mode)
             gr.HTML('<div class="nst-step">4 · Trace it <span class="nst-pill">recommended</span></div>', padding=False)
-            with gr.Accordion("See what really happens when your code runs", open=False):
+            with gr.Accordion("See what really happens when your code runs", open=False, elem_id="nst-trace"):
                 gr.Markdown("Reading code only lets AI guess. A trace records every pin read/write, "
                             "`pulseIn()` duration, I2C scan and the slowest `loop()` while your sketch runs.")
                 trace_btn = gr.Button("1. Make a traced copy of my sketch", size="sm")
