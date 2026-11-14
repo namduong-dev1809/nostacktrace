@@ -163,6 +163,8 @@ def check_input_only_pins(dg, sk):
 def check_unwired_pins(dg, sk):
     out = []
     for p in sorted(sk.used_pins()):
+        if dg.board == "uno" and p == "13":  # on-board LED "L" is wired to pin 13
+            continue
         net = dg.board_net(p)
         if not any(e.split(":", 1)[0] != dg.board_id for e in net):
             out.append(dict(id="pin-not-wired", severity="high",

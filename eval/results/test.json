@@ -1,0 +1,349 @@
+{
+ "11-distance-log": {
+  "model": "gemini-3.6-flash",
+  "category": "timing",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies the 1000 microsecond pulseIn timeout as the root cause in its primary diagnosis and provides the accurate fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately identifies the 1000 microsecond timeout in pulseIn() as the root cause, explaining that it caps the range to roughly 17 cm, and suggests using a 30000 microsecond timeout as a fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The sensor reports 'Out of range' at 100 cm because `pulseIn()` has its timeout set to 1000 microseconds (1 ms), which caps the maximum measurable distance to ~17 cm. Distances beyond ~17 cm cause `pulseIn()` to time out and return 0.",
+   "causes": [
+    {
+     "title": "pulseIn() timeout parameter is too short",
+     "category": "timing",
+     "likelihood": "high",
+     "why": "In the line `unsigned long duration = pulseIn(7, HIGH, 1000);`, the 3rd argument sets a 1000 microsecond timeout. Measuring 100 cm requires approximately 5800 microseconds, causing `pulseIn()` to return 0 ('Out of range') for any distance over ~17 cm.",
+     "check": "Remove the 1000 timeout argument or set it higher (e.g., `pulseIn(7, HIGH)`) and test at 100 cm distance.",
+     "fix": "Change `pulseIn(7, HIGH, 1000);` to `pulseIn(7, HIGH, 30000);` or simply `pulseIn(7, HIGH);` to allow sufficient time for echo pulses up to max range.",
+     "source": "datasheet:arduino_pulsein_timeout"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.6-flash"
+  },
+  "baseline": "### What is wrong\n\nThe problem is the **`1000`** microsecond timeout parameter in your `pulseIn()` function call:\n\n```cpp\nunsigned long duration = pulseIn(7, HIGH, 1000);\n```\n\n* Sound takes approximately **58 microseconds per centimeter** for a round trip (to the object and back).\n* A **1000 µs** timeout limits the maximum measurable distance to only about **17 cm** ($\\frac{1000}{58} \\approx 17.2\\text{ cm}$).\n* When the target object is at 100 cm, the echo pulse lasts around **5800 µs**. Because 5800 µs exceeds your 1000 µs timeout, `pulseIn()` gives up, returns `0`, and triggers your `\"Out of range\"` message.\n\n---\n\n### How to fix it\n\nRemove the `1000` timeout parameter to use Arduino's default 1-second (1,000,000 µs) timeout, or set it to **`30000`** µs (which supports distances up to ~500 cm, well beyond the HC-SR04's 400 cm maximum limit).\n\n#### Fixed `sketch.ino`:\n\n```cpp\nvoid setup() {\n  Serial.begin(115200);\n  pinMode(6, OUTPUT);\n  pinMode(7, INPUT);\n}\n\nvoid loop() {\n  digitalWrite(6, LOW);\n  delayMicroseconds(2);\n  digitalWrite(6, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(6, LOW);\n\n  // Use default timeout (or pulseIn(7, HIGH, 30000) for a custom 30ms timeout)\n  unsigned long duration = pulseIn(7, HIGH);\n\n  if (duration == 0) {\n    Serial.println(\"Out of range\");\n  } else {\n    Serial.println(duration / 58.0);\n  }\n  \n  delay(100);\n}\n```"
+ },
+ "12-slow-blink": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "timing",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately identifies that delayMicroseconds(1000) causes a 1 ms pulse instead of 1000 ms, and provides the exact correct fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that delayMicroseconds(1000) causes a 1 millisecond interval instead of 1000 milliseconds, explaining the rapid flashing behavior."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The LED stays almost dark with tiny flashes because the code toggles the pin rapidly and creates a very brief on-time followed by a long loop restart, resulting in a low duty cycle.",
+   "causes": [
+    {
+     "title": "Rapid toggling and short pulse on-time",
+     "category": "code",
+     "likelihood": "high",
+     "why": "In loop(), the code turns the lamp on, waits only 1000 microseconds (1 millisecond), toggles it off, and then restarts the millis() timing loop where it stays off for 1 second before doing it again.",
+     "check": "Add a 1000-millisecond delay instead of microsecond delay after turning the LED on.",
+     "fix": "Replace delayMicroseconds(1000); with delay(1000); and remove the redundant toggling.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "The issue is happening because of how your `loop()` function is structured. \n\n### What is going wrong?\n1. **The blinking happens too fast to see:** Inside your `while` loop, you wait for 1 second, but then immediately after, you toggle the LED state (`lampOn = !lampOn`), wait just **1 millisecond** (`delayMicroseconds(1000)`), and toggle it back. This rapid flashing (for only 1ms out of every 1000ms) makes the LED look \"almost dark with tiny flashes\" to the human eye.\n2. **`previous` is reset every loop:** `unsigned long previous = millis();` is placed *inside* the `loop()`, which means it gets reset to the current time every single time `loop()` starts over. This breaks standard non-blocking timing logic.\n\n---\n\n### How to fix it\n\nSince you are a student learning Arduino, the standard and cleanest way to make an LED blink for 1 second on and 1 second off (without using `delay()`, which blocks the whole program) is to use `millis()` properly by keeping `previous` outside the loop using `static` or global variables.\n\nHere is the corrected `sketch.ino`:\n\n```cpp\nbool lampOn = false;\nunsigned long previousMillis = storeTime(); // Or just initialize to 0\nunsigned long previous = 0;\n\nvoid setup() { \n  pinMode(9, OUTPUT); \n}\n\nvoid loop() {\n  unsigned long currentMillis = millis();\n\n  // Check if 1000 milliseconds (1 second) have passed\n  if (currentMillis - previous >= 1000) {\n    previous = currentMillis; // Save the last time the LED changed\n    \n    lampOn = !lampOn;         // Toggle the state\n    digitalWrite(9, lampOn);  // Apply the state to the LED\n  }\n}\n```\n\n### Why this works:\n* **Removes the inner `while` loop and microseconds delays:** The `loop()` function runs thousands of times per second freely.\n* **Compares time differences:** It constantly checks if the difference between the current time (`millis()`) and the last recorded time (`previous`) has reached `1000` milliseconds (1 second).\n* **Flips cleanly:** Once a second passes, it flips the LED state exactly once, resulting in a solid 1 second ON, 1 second OFF pattern."
+ },
+ "13-lab-counter": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "code",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that clearing the LCD inside the loop causes the text to be erased immediately, matching the known root cause."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that placing lcd.clear() immediately after printing/inside the loop is the main issue causing the text to be wiped out and erased."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The LCD screen is flickering and the text cannot be read because the `lcd.clear()` function is being called immediately after printing the count in every loop iteration, wiping the display 1000 times a second.",
+   "causes": [
+    {
+     "title": "Frequent screen clearing in loop",
+     "category": "code",
+     "likelihood": "high",
+     "why": "The line `lcd.clear();` is called at the end of every loop iteration right after printing, which erases the display continuously.",
+     "check": "Look at loop() in your code and check if lcd.clear() is called repeatedly.",
+     "fix": "Remove `lcd.clear();` from the `loop()` function, and only use `lcd.setCursor(0, 0)` to overwrite text as needed.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "The main issue in your code is the use of **`lcd.clear()` inside the `loop()` function right after printing**. \n\n### Why is this happening?\n1. **The Flickering:** `lcd.clear()` wipes the entire screen and moves the cursor back to `(0,0)`. Because you run this every second right after printing, the screen is constantly being erased and redrawn, causing the text to disappear for almost the whole second, resulting in a quick flicker.\n2. **Missing Text:** Combined with the rapid clearing, `count++` increments very fast (depending on how fast the loop runs), and the logic gets chaotic. \n\n*(Note: Your Wokwi wiring and I2C address are completely correct!)*\n\n---\n\n### How to fix it\n\nInstead of using `lcd.clear()` on every loop, you should **only overwrite the specific characters** or only use `lcd.clear()` in `setup()`. \n\nHere are two ways to fix your `sketch.ino`:\n\n#### Option 1: The Simple Fix (Overwrite the line)\nInstead of clearing the whole screen, just set the cursor back to where the number starts and print spaces to clear old digits if the number gets smaller (though for a growing counter, just overwriting works fine).\n\n```cpp\n#include <Wire.h>\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\nunsigned long count = 0;\n\nvoid setup() {\n  lcd.init();\n  lcd.backlight();\n  lcd.setCursor(0, 0);\n  lcd.print(\"Count: \"); // Print the static text just once in setup\n}\n\nvoid loop() {\n  lcd.setCursor(7, 0); // Move cursor right after \"Count: \"\n  lcd.print(count);    // Print the current count\n  lcd.print(\"   \");    // Clear any leftover trailing digits from previous numbers\n  \n  count++;\n  delay(1000);\n}\n```\n\n#### Option 2: If you really want to use `lcd.clear()`\nIf you must use `lcd.clear()`, it should only happen *before* you print, and you shouldn't delay *after* clearing without printing first. However, Option 1 is much better for LCDs to prevent flickering."
+ },
+ "14-arm-indicator": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately identifies that the Servo library takes over Timer 1 on the Uno, disabling PWM on pins 9 and 10, and suggests moving to a different PWM pin as the fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately identifies that the Servo library takes Timer 1, which disables PWM on pins 9 and 10 as the primary diagnosis and explains it thoroughly."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The Servo library on the Arduino Uno disables PWM functionality on pins 9 and 10 because it uses Timer 1 for timing, which breaks analogWrite() on pin 10.",
+   "causes": [
+    {
+     "title": "Servo library disables PWM on pins 9 and 10",
+     "category": "code",
+     "likelihood": "high",
+     "why": "Your code calls arm.attach(9), which configures the Servo library to take over Timer 1. On the Arduino Uno, Timer 1 controls PWM output for both pin 9 and pin 10, preventing analogWrite(10, 128) from working correctly.",
+     "check": "Move the LED resistor from pin 10 to a different PWM pin not controlled by Timer 1, such as pin 3 or 5.",
+     "fix": "Change the LED pin to pin 3 or 5 in both your pinMode setup and wiring, and update analogWrite() accordingly.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "The issue you are experiencing is a classic limitation of the standard Arduino `Servo` library. \n\n### Why is this happening?\nOn standard AVR-based Arduino boards like the Uno, the `Servo` library controls servo motors by generating precise timing pulses using **Timer 1**. \n\nHowever, using Timer 1 disables the PWM (Pulse Width Modulation) functionality on **Pins 9 and 10**. Because your LED is connected to Pin 10, calling `analogWrite(10, 128)` stops working correctly as soon as `arm.attach(9)` is executed, causing the LED to turn off or behave unpredictably instead of staying at half brightness.\n\n---\n\n### How to Fix It\n\nDepending on what you want to achieve, you have two main solutions:\n\n#### Solution 1: Move the LED to a non-PWM pin (If you just want it ON/OFF)\nIf the LED doesn't actually need to be dimmed (half brightness), move it to a digital pin that doesn't rely on Timer 1's PWM, or use standard `digitalWrite()`. However, if you specifically need PWM (dimming) on the LED, use Solution 2.\n\n#### Solution 2: Move the Servo to Pin 3 or 11 (Recommended)\nPins 3 and 11 use **Timer 2**, whereas Pins 9 and 10 use **Timer 1**. By moving the servo control wire to Pin 3, you free up Timer 1 so that `analogWrite()` will work normally on Pins 9 and 10.\n\n**1. Update `sketch.ino`:**\nChange pin 9 to pin 3:\n```cpp\n#include <Servo.h>\nServo arm;\nvoid setup() {\n  pinMode(10, OUTPUT);\n  arm.attach(3); // Moved from 9 to 3\n  arm.write(90);\n  analogWrite(10, 128); // This will now work!\n}\nvoid loop() { }\n```\n\n**2. Update `diagram.json`:**\nChange the servo connection from `board:9` to `board:3`:\n```json\n    [\n      \"servo:PWM\",\n      \"board:3\",\n      \"green\",\n      []\n    ],\n```"
+ },
+ "15-room-climate": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately identifies the mismatch between the DHT11 code configuration and the DHT22 hardware, and provides the exact correct fix."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies the sensor type mismatch between DHT11 and DHT22 as both the primary diagnosis and the main fix."
+   }
+  },
+  "nostacktrace": {
+   "summary": "The code initializes the DHT sensor as DHT11, but the wiring uses a wokwi-dht22 sensor.",
+   "causes": [
+    {
+     "title": "Incorrect DHT sensor model in code",
+     "category": "code",
+     "likelihood": "high",
+     "why": "The code uses `DHT sensor(2, DHT11);` but the schematic uses a `wokwi-dht22` sensor, causing reading failures and incorrect data translation.",
+     "check": "Look at the sensor component label in your circuit diagram to verify if it is a DHT11 or DHT22.",
+     "fix": "Change `DHT11` to `DHT22` in the sensor constructor: `DHT sensor(2, DHT22);`.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "There are two main issues causing your project to fail: a **mismatch in the sensor type** between your code and your diagram, and a **wiring mistake** in your diagram.\n\n### The Problems:\n1. **Sensor Type Mismatch:** \n   * In your `sketch.ino`, you initialized the library for a `DHT11` (`DHT sensor(2, DHT11);`).\n   * In your `diagram.json`, you placed a `DHT22` sensor (`\"type\": \"wokwi-dht22\"`). Because the communication protocols differ, the DHT library cannot read the DHT22 properly, resulting in `isnan()` (Read failed) or incorrect values.\n2. **Incorrect Pin Label Connection:**\n   * DHT sensors use a single Data pin, but Wokwi labels this pin as `SDA` in its diagram parts (which is a naming leftover, as DHT is not I2C). However, looking at your code, you connected it to Digital Pin `2`. \n   * More importantly, DHT11/DHT22 sensors on Wokwi **do not require an external pull-up resistor** in the diagram connections—trying to wire one like an I2C device often causes floating or shorted logic states on pin 2.\n\n---\n\n### How to Fix It:\n\n#### Option A: Make everything a DHT22 (Recommended)\nSince your diagram already uses the DHT22 (which is more accurate than the DHT11), just update your code to match the sensor.\n\n1. Replace your `sketch.ino` with this:\n```cpp\n#include <DHT.h>\n\n// Change DHT11 to DHT22 here:\nDHT sensor(2, DHT22);\n\nvoid setup() {\n  Serial.begin(115200);\n  sensor.begin();\n}\n\nvoid loop() {\n  float t = sensor.readTemperature();\n  float h = sensor.readHumidity();\n  \n  if (isnan(t) || isnan(h)) {\n    Serial.println(\"Read failed\");\n  } else {\n    Serial.print(\"Temperature: \");\n    Serial.print(t);\n    Serial.print(\" C, humidity: \");\n    Serial.print(h);\n    Serial.println(\"%\");\n  }\n  \n  // DHT22 needs at least 2 seconds between readings\n  delay(2500);\n}\n```\n\n2. Replace your `diagram.json` with this simplified version (removes the unnecessary pull-up resistor causing potential interference):\n```json\n{\n  \"version\": 1,\n  \"author\": \"NoStackTrace evaluation\",\n  \"editor\": \"wokwi\",\n  \"parts\": [\n    {\n      \"type\": \"wokwi-arduino-uno\",\n      \"id\": \"board\",\n      \"left\": 0,\n      \"top\": 0,\n      \"attrs\": {}\n    },\n    {\n      \"type\": \"wokwi-dht22\",\n      \"id\": \"sensor\",\n      \"left\": 330,\n      \"top\": 20,\n      \"attrs\": {}\n    }\n  ],\n  \"connections\": [\n    [\"sensor:VCC\", \"board:5V\", \"red\", []],\n    [\"sensor:GND\", \"board:GND.1\", \"black\", []],\n    [\"sensor:SDA\", \"board:2\", \"green\", []]\n  ]\n}\n```\n\n#### Option B: Switch to DHT11\nIf you specifically want to use a DHT11 in the simulation:\n1. Change `\"type\": \"wokwi-dht22\"` to `\"type\": \"wokwi-dht11\"` inside your `diagram.json`.\n2. Keep your original `sketch.ino` (which uses `DHT11`).\n3. Still remove the extra pull-up resistor from `diagram.json`, as the DHT library handles internal communication timing."
+ },
+ "16-den-ban": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that pin 4 does not support hardware PWM for analogWrite and provides the exact correct fix of moving to a PWM-capable pin."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies in the first paragraph that Arduino Uno pin 4 lacks hardware PWM and falls back to digital HIGH/LOW for analogWrite, matching the known root cause."
+   }
+  },
+  "nostacktrace": {
+   "summary": "Đèn không sáng dần mà chỉ tắt rồi bật hẳn lên vì chân 4 trên Arduino Uno không hỗ trợ PWM.",
+   "causes": [
+    {
+     "title": "Chân cắm không hỗ trợ PWM",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "Bạn dùng hàm analogWrite() trên chân 4 trong đoạn code `pinMode(4, OUTPUT);` và `analogWrite(4, brightness);`, nhưng Arduino Uno chỉ hỗ trợ PWM trên các chân 3, 5, 6, 9, 10 và 11.",
+     "check": "Kiểm tra xem dây dương của điện trở đang cắm vào chân số 4 trên board.",
+     "fix": "Di chuyển dây kết nối từ chân 4 sang một chân hỗ trợ PWM trên Arduino Uno như chân 3, 5, 6, 9, 10 hoặc 11.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "Chào bạn, lỗi này xảy ra vì **chân số 4 (Pin 4) trên Arduino Uno không phải là chân PWM** (chân điều chế độ rộng xung). \n\nTrên Arduino Uno, chỉ các chân có ký hiệu dấu ngã (`~`) mới hỗ trợ hàm `analogWrite()`, đó là các chân: **3, 5, 6, 9, 10, và 11**. Khi bạn dùng `analogWrite()` trên chân số 4 (không phải chân PWM), Arduino sẽ hiểu giá trị `> 0` là Bật hết cỡ (HIGH), và `= 0` là Tắt (LOW), dẫn đến hiện tượng đèn chỉ có tắt hoặc sáng hẳn.\n\n---\n\n### Cách khắc phục:\n\nBạn có thể sửa theo 1 trong 2 cách sau:\n\n#### Cách 1: Đổi chân trên code (Khuyên dùng)\nĐổi chân `4` thành chân `9` (hoặc 3, 5, 6, 10, 11) trong file `sketch.ino`, đồng thời nối dây từ chân 9 sang điện trở trong sơ đồ.\n\n**Sửa file `sketch.ino`:**\n```cpp\nvoid setup() { \n  pinMode(9, OUTPUT); // Đổi chân 4 thành chân 9\n}\n\nvoid loop() {\n  for (int brightness = 0; brightness <= 255; brightness++) {\n    analogWrite(9, brightness); // Đổi chân 4 thành chân 9\n    delay(20);\n  }\n}\n```\n\n**Sửa file `diagram.json` (dòng kết nối chân 4 thành chân 9):**\nTìm đoạn này:\n```json\n    [\n      \"board:4\",\n      \"r:1\",\n      \"green\",\n      []\n    ],\n```\nVà đổi thành:\n```json\n    [\n      \"board:9\",\n      \"r:1\",\n      \"green\",\n      []\n    ],\n```\n\nSau khi sửa xong, bạn bấm chạy lại trên Wokwi sẽ thấy đèn từ từ sáng lên rất mượt mà!"
+ },
+ "17-nut-van": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the ESP32 uses a 12-bit ADC (max value 4095) instead of the Uno's 10-bit ADC (1023), and provides the correct fix by changing the divisor."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the ESP32 uses a 12-bit ADC (up to 4095) compared to the Uno's 10-bit ADC (1023), and provides the correct fix by changing the divisor to 4095.0."
+   }
+  },
+  "nostacktrace": {
+   "summary": "Mã nguồn tính phần trăm dựa trên giá trị tối đa là 1023 (mặc định của Arduino Uno 10-bit ADC), nhưng ESP32 có ADC 12-bit cho ra giá trị lên tới 4095. Do đó khi xoay núm vặn, giá trị đọc được vượt quá 1023 làm phần trăm vượt mức 100.",
+   "causes": [
+    {
+     "title": "Sai thang đo ADC của ESP32",
+     "category": "code",
+     "likelihood": "high",
+     "why": "Đoạn code dùng 1023.0 để tính phần trăm: float percent = raw * 100.0 / 1023.0;, trong khi ESP32 sử dụng ADC 12-bit có giá trị tối đa là 4095.",
+     "check": "Kiểm tra giá trị biến raw in ra Serial Monitor khi xoay cực đại xem có đạt khoảng 4095 hay không.",
+     "fix": "Thay đổi số chia từ 1023.0 thành 4095.0 trong công thức tính phần trăm.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "Vấn đề trong code của em nằm ở giá trị đọc tối đa của cảm biến (ADC). \n\nTrên các dòng Arduino thông thường (như Uno, Nano), hàm `analogRead()` trả về giá trị từ **0 đến 1023** (10-bit). Tuy nhiên, **ESP32 sử dụng ADC 12-bit**, nghĩa là hàm `analogRead()` sẽ trả về giá trị từ **0 đến 4095**.\n\nDo em đang chia cho `1023.0` trong khi giá trị nhận được có thể lên tới `4095`, nên khi xoay biến trở qua giữa, kết quả tính ra sẽ vượt quá 100% (lên đến ~400%).\n\n---\n\n### Cách khắc phục:\n\nEm chỉ cần sửa số `1023.0` thành `4095.0` trong file `sketch.ino`.\n\nSửa đoạn code thành như thế này:\n\n```cpp\nvoid setup() { \n  Serial.begin(115200); \n}\n\nvoid loop() {\n  int raw = analogRead(34);\n  \n  // Đổi 1023.0 thành 4095.0 vì ESP32 dùng ADC 12-bit\n  float percent = raw * 100.0 / 4095.0; \n  \n  Serial.print(\"Muc: \");\n  Serial.print(percent);\n  Serial.println(\" %\");\n  \n  delay(200);\n}\n```\n\nSau khi sửa xong, khi em xoay biến trở ở giữa màn hình sẽ hiển thị khoảng `50%`, và xoay hết cỡ sẽ là `100%`."
+ },
+ "18-cam-bien-nghieng": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer accurately and directly identifies the MPU6050 address mismatch caused by AD0 being pulled high and provides the correct fix matching the root cause."
+   },
+   "baseline": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the MPU6050 AD0 pin is tied high, setting the I2C address to 0x69 while the code uses 0x68, and provides both valid fixes."
+   }
+  },
+  "nostacktrace": {
+   "summary": "Màn hình liên tục báo không tìm thấy cảm biến MPU6050 do địa chỉ I2C cấu hình trong code khác với trạng thái chân AD0 trên phần cứng.",
+   "causes": [
+    {
+     "title": "MPU6050 address mismatch",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "AD0 is high in the wiring (board:3V3 -- imu:AD0), so the chip answers on 0x69, but the code uses const uint8_t imuAddress = 0x68;",
+     "check": "Kiểm tra lại kết nối chân AD0 và so sánh địa chỉ I2C với code.",
+     "fix": "Sửa lại địa chỉ trong code thành 0x69 hoặc nối chân AD0 của MPU6050 xuống GND.",
+     "source": "rule:i2c-address"
+    }
+   ],
+   "rule_findings": [
+    {
+     "id": "i2c-address",
+     "severity": "high",
+     "title": "MPU6050 address mismatch (0x68 in code, 0x69 by wiring)",
+     "evidence": "AD0 is high, so the chip answers on 0x69.",
+     "fix": "Use 0x69 in the code, or rewire AD0."
+    }
+   ],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "Chào bạn, lỗi **\"Không tìm thấy cảm biến\"** (nói cách khác là lỗi I2C ACK, `endTransmission` trả về giá trị khác 0) trong trường hợp này xuất phát từ một **sự mâu thuẫn về địa chỉ I2C** giữa code và sơ đồ mạch (diagram).\n\n### Nguyên nhân:\n1. **Trong code:** Bạn đang định nghĩa `const uint8_t imuAddress = 0x68;`.\n2. **Trong `diagram.json`:** Chân `AD0` của MPU6050 đang được nối lên `3V3` (`\"imu:AD0\", \"board:3V3\"`). \n   - Khi chân `AD0` được kéo lên mức cao (HIGH / 3V3), địa chỉ I2C của MPU6050 sẽ thay đổi từ `0x68` thành **`0x69`**.\n   - Do code tìm kiếm ở địa chỉ `0x68` nhưng cảm biến thực tế ở địa chỉ `0x69`, vi điều khiển không nhận được phản hồi nên báo lỗi.\n\n---\n\n### Cách khắc phục:\n\nBạn có thể chọn **một trong hai** cách sau đây:\n\n#### Cách 1: Sửa lại code (Khuyên dùng nếu bạn muốn giữ nguyên mạch)\nĐổi địa chỉ `imuAddress` trong file `sketch.ino` thành `0x69`:\n\n```cpp\n#include <Wire.h>\n\nconst uint8_t imuAddress = 0x69; // Đổi từ 0x68 thành 0x69 vì chân AD0 đang nối lên 3V3\n\nvoid setup() {\n  Serial.begin(115200);\n  Wire.begin(21, 22);\n}\n\nvoid loop() {\n  Wire.beginTransmission(imuAddress);\n  Wire.write(0x75);\n  if (Wire.endTransmission(false) != 0) {\n    Serial.println(\"Khong tim thay cam bien\");\n  } else {\n    Wire.requestFrom(imuAddress, (uint8_t)1);\n    if (Wire.available()) {\n      Serial.print(\"WHO_AM_I: 0x\");\n      Serial.println(Wire.read(), HEX); // Sẽ trả về 0x68 (đây là giá trị mặc định của thanh ghi WHO_AM_I trên MPU6050)\n    }\n  }\n  delay(1000);\n}\n```\n\n#### Cách 2: Sửa lại file `diagram.json` (Nếu bạn muốn dùng địa chỉ `0x68`)\nNếu bạn muốn giữ nguyên code với địa chỉ `0x68`, hãy nối chân `AD0` xuống `GND` để đưa địa chỉ về `0x68`. \n\nMở file `diagram.json` và tìm dòng:\n```json\n    [\n      \"imu:AD0\",\n      \"board:3V3\",\n      \"red\",\n      []\n    ]\n```\nSửa thành:\n```json\n    [\n      \"imu:AD0\",\n      \"board:GND.2\",\n      \"black\",\n      []\n    ]\n```\n\nSau khi áp dụng một trong hai cách trên, hãy bấm **Start Simulation** lại trên Wokwi, màn hình Serial Monitor sẽ hiển thị đúng giá trị `WHO_AM_I: 0x68`."
+ },
+ "19-chuong-bao": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": true,
+    "any": true,
+    "note": "The answer correctly identifies that the Wokwi buzzer is a passive buzzer requiring an oscillating signal rather than a constant HIGH voltage, and suggests using the tone function as the fix."
+   },
+   "baseline": {
+    "top1": false,
+    "any": true,
+    "note": "The answer mentions that digitalWrite HIGH provides DC without oscillation, but its primary diagnosis (top1) incorrectly claims the Wokwi buzzer is an Active Buzzer and blames the lack of PWM on pin 8. However, it later identifies the correct fix by suggesting the tone() function."
+   }
+  },
+  "nostacktrace": {
+   "summary": "Bạn dùng còi không có mạch tạo âm thanh sẵn (active buzzer), gọi là wokwi-buzzer đơn thuần. Lệnh digitalWrite(8, HIGH) chỉ tạo ra một mức điện áp DC không đổi, làm màng còi kêu một tiếng tách rồi đứng yên thay vì phát ra tiếng hú liên tục.",
+   "causes": [
+    {
+     "title": "Còi thụ động (buzzer đơn thuần) cần tín hiệu dao động (tone) thay vì mức điện áp cố định",
+     "category": "code",
+     "likelihood": "high",
+     "why": "Bạn dùng lệnh digitalWrite(8, HIGH); trên chân 8 kết nối với còi wokwi-buzzer, điều này giữ chân ở mức cao liên tục và chỉ tạo ra một tiếng tách duy nhất.",
+     "check": "Thay lệnh digitalWrite(8, HIGH); bằng hàm tone(8, 1000); trong phần setup() xem còi có kêu liên tục không.",
+     "fix": "Sử dụng hàm tone(8, 1000); để tạo xung âm thanh tần số 1000Hz thay vì dùng digitalWrite.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "Chào bạn! Tiếng \"tách\" mà bạn nghe thấy chính là khoảnh khắc chân pin chuyển đổi trạng thái, nhưng còi không kêu liên tục vì hai nguyên nhân chính sau đây:\n\n### 1. Nguyên nhân\n* **Loại còi (Buzzer):** Trong Wokwi, linh kiện `wokwi-buzzer` mặc định là một **Active Buzzer** (còi có mạch dao động bên trong) hoặc cần tín hiệu thay đổi liên tục (PWM/tần số) đối với một số loại loa. Tuy nhiên, vấn đề lớn nhất ở đây là **cách kết nối dây** và **bản chất của chân số 8**.\n* **Chân số 8 của Arduino Uno:** Không phải là chân hỗ trợ PWM (PWM chỉ có trên các chân `3, 5, 6, 9, 10, 11`). Khi bạn cấp mức `HIGH` tĩnh (`digitalWrite(8, HIGH)`), chân này chỉ cung cấp dòng điện một chiều (DC) liên tục mà không tạo ra dao động âm thanh để màng còi rung lên.\n\n---\n\n### 2. Cách khắc phục\n\nĐể còi kêu liên tục, bạn cần dùng lệnh phát ra tần số âm thanh (như hàm `tone()`) hoặc đổi sang dùng chân PWM và tạo vòng lặp bật/tắt. \n\nCách đơn giản và chuẩn nhất là sử dụng hàm `tone()` trong Arduino:\n\n#### Sửa lại file `sketch.ino`:\n```cpp\nvoid setup() {\n  // Phát ra âm thanh có tần số 1000 Hz liên tục ở chân 8\n  tone(8, 1000); \n}\n\nvoid loop() {\n  // Không cần làm gì ở đây cả\n}\n```\n\nVới đoạn code này, Arduino sẽ liên tục gửi xung điện có tần số 1000Hz ra chân 8, làm cho còi kêu liên tục ngay khi chương trình bắt đầu chạy."
+ },
+ "20-dem-lan-bam": {
+  "model": "gemini-3.5-flash-lite",
+  "category": "part-specific",
+  "grade": {
+   "nostacktrace": {
+    "top1": false,
+    "any": false,
+    "note": "The answer attributes the issue to wiring errors causing a short circuit and incorrect button connections on pin 4, whereas the root cause is that pin 4 does not support external interrupts on the Arduino Uno."
+   },
+   "baseline": {
+    "top1": false,
+    "any": false,
+    "note": "The answer incorrectly blames the wiring and push button configuration on pin 4, whereas the root cause is that pin 4 does not support external interrupts on the Arduino Uno (only D2 and D3 do)."
+   }
+  },
+  "nostacktrace": {
+   "summary": "Bo dem khong tang khi bam nut vi cach dau noi nut nhan dang bi sai mach hoac ngan mach khong tao duoc su thay doi muc dien ap tren chan 4.",
+   "causes": [
+    {
+     "title": "Dau noi nut nhan khong dung chan hoac gay ngan mach xuong GND",
+     "category": "wiring",
+     "likelihood": "high",
+     "why": "Trong phan wiring, net giua board:4 va nut nhan dang noi ca hai dau ben trai va ben phai cua nut (button:1.l va button:1.r) vao cung mot chan 4 va GND, khien chan 4 luon o muc LOW hoac khong tao duoc xung canh xuong (FALLING) khi bam.",
+     "check": "Kiem tra lai so do lap rap de dam bao mot dau cua nut nhan noi vao chan 4 va dau con lai noi vao GND.",
+     "fix": "Dau lai nut nhan sao cho mot dau noi vao chan 4 va dau con lai noi vao GND, bo ket noi nhieu chan qua lai tren cung mot nut.",
+     "source": "reasoning"
+    },
+    {
+     "title": "Thieu tro keo hoac cau hinh chan ngat khong phu hop",
+     "category": "code",
+     "likelihood": "medium",
+     "why": "Code dung pinMode(4, INPUT_PULLUP) nhung cach di day va trang thai vat ly cua nut bam co the dang gay cham mach truc tiep hoac khong cung cap duoc duong di dien ap chuan cho chan 4.",
+     "check": "Do dien ap tai chan 4 khi bam va khong bam nut xem co thay doi tu HIGH xuong LOW hay khong.",
+     "fix": "Dam bao chan 4 duoc cau hinh INPUT_PULLUP va nut nhan noi truc tiep chan 4 xuong GND.",
+     "source": "reasoning"
+    }
+   ],
+   "rule_findings": [],
+   "model": "gemini-3.5-flash-lite"
+  },
+  "baseline": "Chào bạn, vấn đề trong mạch của bạn nằm ở **sự kết nối chân của nút nhấn (pushbutton) trong file `diagram.json`**. \n\nNút nhấn trên Wokwi có 4 chân, và việc bạn nối chưa đúng cách khiến cho chân số 4 của Arduino không nhận được tín hiệu thay đổi mức điện áp (HIGH xuống LOW) khi bạn bấm nút.\n\n### Cách khắc phục:\n\nBạn hãy sửa lại file **`diagram.json`** phần kết nối (connections) hoặc cấu hình lại cách đặt chân nút bấm. \n\nDưới đây là file `diagram.json` đã được sửa lại để nút bấm kết nối đúng chuẩn với chân 4 và GND:\n\n```json\n{\n  \"version\": 1,\n  \"author\": \"NoStackTrace evaluation\",\n  \"editor\": \"wokwi\",\n  \"parts\": [\n    {\n      \"type\": \"wokwi-arduino-uno\",\n      \"id\": \"board\",\n      \"left\": 0,\n      \"top\": 0,\n      \"attrs\": {}\n    },\n    {\n      \"type\": \"wokwi-pushbutton\",\n      \"id\": \"button\",\n      \"left\": 330,\n      \"top\": 180,\n      \"attrs\": {\n        \"bounce\": \"0\"\n      }\n    }\n  ],\n  \"connections\": [\n    [ \"board:4\", \"button:1.r\", \"green\", [ \"0\" ] ],\n    [ \"button:2.r\", \"board:GND.1\", \"black\", [ \"0\" ] ]\n  ]\n}\n```\n\n### Giải thích thêm:\n* Nút nhấn trong Wokwi có các cặp chân thông nhau theo chiều dọc. Khi đổi từ `1.l`/`2.l` sang `1.r`/`2.r` (hoặc cắm đúng cặp chân đối diện qua rãnh ở giữa), mạch điện kín sẽ được thiết lập.\n* Khi bạn bấm nút, chân 4 sẽ được nối xuống `GND` (tạo tín hiệu `FALLING` mà hàm `attachInterrupt` đang chờ đợi), giúp biến `presses` tăng lên và màn hình Serial Monitor sẽ hiển thị đúng số lần bấm."
+ }
+}

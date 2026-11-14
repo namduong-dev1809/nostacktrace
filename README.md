@@ -67,16 +67,31 @@ answer key, without seeing this app's rules or prompts. Both arms get the same s
 `diagram.json` and symptom and use the same Gemini model; a Gemini judge compares each answer with
 the key (`run_eval.py`).
 
-| Split | NoStackTrace top-1 | Plain Gemini top-1 |
-| --- | --- | --- |
-| Dev (10), code + wiring only, no trace | 10/10 | 10/10 |
-| Test (10) | not run yet | not run yet |
+| Split | NoStackTrace top-1 | Plain Gemini top-1 | Found anywhere (NST / plain) |
+| --- | --- | --- | --- |
+| Dev (10), used for prompt tuning | 10/10 | 10/10 | 10/10 / 10/10 |
+| Test (10), held out, run once | 9/10 | 8/10 | 9/10 / 9/10 |
 
-Honest reading: on static code + wiring, a plain chat model already finds these faults. Answers
-from NoStackTrace were shorter (median 66 vs 207 words) and cite their source, but that alone is
-not a reason to use a new app. The difference Trace mode adds is evidence from the running board,
-which a chat model reading code does not have. That claim is shown by the maze example, not yet
-measured on the eval set.
+Test models: gemini-3.5-flash-lite (9 circuits) and gemini-3.6-flash (1), the same model for both
+arms of each circuit. Median answer length on test: 57 words (NoStackTrace) vs 275 (plain chat).
+
+Honest reading: on static code + wiring, a plain chat model already finds most of these faults; a
+one-circuit difference on 10 is not significant. NoStackTrace answers are about 5x shorter and say
+where each claim comes from, but that alone is not a reason to use a new app. What Trace mode adds
+is evidence from the running board, which a model reading code does not have. That is shown by
+the three examples below with real Wokwi logs, not yet measured on the eval set (its circuits have
+no runtime logs).
+
+### Examples with real Wokwi trace logs
+
+Each log in `examples/*/serial_log.txt` was recorded in Wokwi from the traced sketch and is unedited
+(see the `serial_log.source.md` next to it).
+
+| Example | What the trace shows | Finding |
+| --- | --- | --- |
+| Maze robot freezes (ESP32) | `pulseIn(18)=0` took 1,000,018 us | `trace-pulsein-timeout` |
+| Lamp button ignores taps (Uno) | one `loop()` pass took 2.00 s; the button is read once per pass | `trace-slow-loop` |
+| LCD stays blank (Uno) | I2C scan found `0x27`; the code uses `0x3F` | `trace-i2c-address` |
 
 All 20 eval sketches and the example compile with `arduino-cli`, both original and traced
 (`compile_check.py`). The eval circuits have not all been run by hand in Wokwi.

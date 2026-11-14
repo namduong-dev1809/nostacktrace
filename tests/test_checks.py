@@ -41,6 +41,10 @@ class TestChecks(unittest.TestCase):
     def test_pulsein_with_timeout_is_clean(self):
         self.assertEqual(run_checks(SONAR_CODE % ", 30000", SONAR_DIAGRAM), [])
 
+    def test_uno_pin13_has_onboard_led(self):
+        code = "void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); }"
+        self.assertEqual(run_checks(code, diagram([UNO], [])), [])
+
     def test_pin_in_code_not_wired(self):
         code = (SONAR_CODE % ", 30000").replace("const int ECHO = 18", "const int ECHO = 19")
         self.assertEqual(ids(run_checks(code, SONAR_DIAGRAM)), ["pin-not-wired"])

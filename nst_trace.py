@@ -168,7 +168,7 @@ def check_trace(events, sketch=""):
                         evidence=f"Trace: {e.get('call')} took {e['took_us']} us ({len(slow)} slow call(s) logged).",
                         fix="Pass a timeout as the third argument, e.g. pulseIn(ECHO, HIGH, 30000)."))
     loops = [e for e in events if "loop_slowest_us" in e]
-    if loops and loops[-1]["loop_slowest_us"] >= 500_000 and not slow:
+    if loops and loops[-1]["loop_slowest_us"] >= 1_000_000 and not slow:
         e = loops[-1]
         out.append(dict(id="trace-slow-loop", severity="medium",
                         title=f"One pass of loop() took {e['loop_slowest_us'] / 1e6:.2f} s",

@@ -1,0 +1,31 @@
+{
+ "summary": "In a long corridor, the ultrasonic sensor fails to receive an echo, causing pulseIn() to block for its default 1-second timeout and stall the robot's loop.",
+ "causes": [
+  {
+   "title": "pulseIn() has no timeout and blocks the loop",
+   "category": "timing",
+   "likelihood": "high",
+   "why": "Trace: pulseIn(18)=0 took 1000022 us (15 slow call(s) logged).",
+   "check": "Observe the Serial monitor pauses and check when the robot enters open space or a long corridor.",
+   "fix": "Pass a timeout as the third argument to pulseIn(), such as pulseIn(ECHO, HIGH, 30000).",
+   "source": "rule:trace-pulsein-timeout"
+  }
+ ],
+ "rule_findings": [
+  {
+   "id": "pulsein-no-timeout",
+   "severity": "high",
+   "title": "pulseIn() has no timeout and can freeze loop() for 1 second",
+   "evidence": "pulseIn(pin, level) waits up to 1,000,000 us when no echo returns (object out of range).",
+   "fix": "Pass a timeout: pulseIn(ECHO, HIGH, 30000) caps the wait near 30 ms (about 5 m)."
+  },
+  {
+   "id": "trace-pulsein-timeout",
+   "severity": "high",
+   "title": "pulseIn() on line 17 blocked for 1.00 s",
+   "evidence": "Trace: pulseIn(18)=0 took 1000022 us (15 slow call(s) logged).",
+   "fix": "Pass a timeout as the third argument, e.g. pulseIn(ECHO, HIGH, 30000)."
+  }
+ ],
+ "model": "gemini-3.5-flash-lite"
+}

@@ -1,0 +1,12 @@
+NST|start|board=uno
+NST|t=49|L10|pinMode(2,2)
+NST|t=50|L11|pinMode(8,1)
+NST|t=50|L12|pinMode(13,1)
+NST|setup_done
+NST|t=54|L16|digitalWrite(13,1)
+NST|t=1054|L18|digitalWrite(13,0)
+NST|t=2054|L21|digitalRead(2)=1
+NST|t=2058|loop_slowest_us=2000060|loops=1
+NST|t=2061|L16|digitalWrite(13,1)
+NST|t=3061|L18|digitalWrite(13,0)
+NST|t=4062|L21|digitalRead(2)=1

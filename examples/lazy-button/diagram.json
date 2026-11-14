@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "author": "NoStackTrace example",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn", "top": -110, "left": 60, "attrs": { "color": "green", "bounce": "0" } },
+    { "type": "wokwi-led", "id": "lamp", "top": -120, "left": 200, "attrs": { "color": "yellow" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": -40, "left": 230, "rotate": 90, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "btn:1.l", "uno:2", "green", [] ],
+    [ "btn:2.l", "uno:GND.1", "black", [] ],
+    [ "lamp:A", "uno:8", "orange", [] ],
+    [ "lamp:C", "r1:1", "black", [] ],
+    [ "r1:2", "uno:GND.2", "black", [] ]
+  ]
+}

@@ -1,0 +1,1 @@
+The LCD stays blank. No text at all, even though the code prints Hello lab!

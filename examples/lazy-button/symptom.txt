@@ -1,0 +1,1 @@
+The lamp button only works sometimes. If I tap it, nothing happens. If I hold it for a couple of seconds, the lamp toggles.

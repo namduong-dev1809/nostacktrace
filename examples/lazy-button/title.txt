@@ -1,0 +1,1 @@
+Lamp button ignores quick taps

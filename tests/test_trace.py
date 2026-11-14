@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from nst_trace import check_trace, instrument, parse_log  # noqa: E402
@@ -71,6 +72,13 @@ class TestTraceChecks(unittest.TestCase):
         log = "NST|start|board=uno\nNST|i2c_scan=0x3F \nNST|setup_done\n"
         self.assertEqual(ids(check_trace(parse_log(log), "LiquidCrystal_I2C lcd(0x27, 16, 2);")), ["trace-i2c-address"])
         self.assertEqual(check_trace(parse_log(log), "LiquidCrystal_I2C lcd(0x3F, 16, 2);"), [])
+
+    def test_real_wokwi_logs(self):
+        ex = Path(__file__).parent.parent / "examples"
+        for name, want in (("maze-sonar", ["trace-pulsein-timeout"]), ("lazy-button", ["trace-slow-loop"]),
+                           ("blank-lcd", ["trace-i2c-address"])):  # blank-lcd also has a 0.5 s delay() loop: not slow
+            log, sketch = (ex / name / "serial_log.txt").read_text(), (ex / name / "sketch.ino").read_text()
+            self.assertEqual(ids(check_trace(parse_log(log), sketch)), want, name)
 
     def test_empty_log_no_findings(self):
         self.assertEqual(check_trace(parse_log("")), [])

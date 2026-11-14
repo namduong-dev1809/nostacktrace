@@ -1,0 +1,5 @@
+NST|start|board=uno
+NST|i2c_scan=0x27
+NST|setup_done
+NST|t=1649|loop_slowest_us=502060|loops=1
+NST|t=2152|loop_slowest_us=502084|loops=2
