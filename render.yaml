@@ -1,0 +1,21 @@
+# Render Blueprint: free web service. Set GEMINI_API_KEY / GROQ_API_KEY in the Render dashboard.
+services:
+  - type: web
+    name: nostacktrace
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.4
+      - key: GRADIO_SERVER_NAME
+        value: 0.0.0.0
+      - key: GRADIO_SERVER_PORT
+        value: "10000"
+      - key: PORT
+        value: "10000"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
