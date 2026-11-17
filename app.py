@@ -144,6 +144,7 @@ def notice(text):
 
 
 def make_trace(sketch, diagram, mode):
+    sketch, diagram = sketch or "", diagram or ""
     if not sketch.strip():
         return "", notice_md("Paste your code first.")
     board = "uno"
@@ -168,6 +169,8 @@ def notice_md(text):
 
 
 def run(sketch, diagram, pin_table, symptom, lang, mode, serial_log=""):
+    # Gradio passes None for a box in a tab that was never opened.
+    sketch, diagram, pin_table, symptom, serial_log = (x or "" for x in (sketch, diagram, pin_table, symptom, serial_log))
     if not sketch.strip() or not symptom.strip():
         return notice("Describe what you see and paste your code first.")
     if mode == "wokwi" and not diagram.strip():
