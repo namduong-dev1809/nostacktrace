@@ -1,0 +1,24 @@
+{
+ "summary": "The lamp button only works sometimes because the sketch uses long delay() calls, making the program unresponsive for two seconds at a time.",
+ "causes": [
+  {
+   "title": "Blocking delay calls in loop()",
+   "category": "timing",
+   "likelihood": "high",
+   "why": "The runtime trace and code show that each pass of loop() takes 2.00 s because of delay(1000) calls: `delay(1000);`",
+   "check": "Try tapping the button precisely during the short window when delay() is not active, or hold it down until the loop restarts.",
+   "fix": "Replace delay() with millis()-based non-blocking timing so the button can be read continuously.",
+   "source": "rule:trace-slow-loop"
+  }
+ ],
+ "rule_findings": [
+  {
+   "id": "trace-slow-loop",
+   "severity": "medium",
+   "title": "One pass of loop() took 2.00 s",
+   "evidence": "Anything that must react quickly (buttons, sensors, motors) waits this long.",
+   "fix": "Look for delay() or blocking calls in loop(); use millis() timing instead."
+  }
+ ],
+ "model": "gemini-3.5-flash-lite"
+}

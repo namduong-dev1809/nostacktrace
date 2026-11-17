@@ -1,13 +1,13 @@
 {
- "summary": "In a long corridor, the ultrasonic sensor fails to receive an echo, causing pulseIn() to block for its default 1-second timeout and stall the robot's loop.",
+ "summary": "The robot freezes and crashes because pulseIn() has no timeout when the ultrasonic sensor fails to receive an echo in a long corridor, blocking the loop for a full second per reading.",
  "causes": [
   {
-   "title": "pulseIn() has no timeout and blocks the loop",
+   "title": "pulseIn() lacks a timeout, causing 1-second freezes",
    "category": "timing",
    "likelihood": "high",
-   "why": "Trace: pulseIn(18)=0 took 1000022 us (15 slow call(s) logged).",
-   "check": "Observe the Serial monitor pauses and check when the robot enters open space or a long corridor.",
-   "fix": "Pass a timeout as the third argument to pulseIn(), such as pulseIn(ECHO, HIGH, 30000).",
+   "why": "Trace: pulseIn(18)=0 took 1000018 us (15 slow call(s) logged).",
+   "check": "Verify that when the sonar points down a long corridor (no echo), the Serial log pauses for exactly one second.",
+   "fix": "Pass a timeout argument to pulseIn, e.g., pulseIn(ECHO, HIGH, 30000).",
    "source": "rule:trace-pulsein-timeout"
   }
  ],

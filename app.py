@@ -15,11 +15,18 @@ if (ROOT / ".env").exists():
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip().strip('"'))
 
-from checks import Diagram, run_checks  # noqa: E402
+from checks import Diagram, DiagramError, run_checks  # noqa: E402
 from nst_trace import check_trace, instrument, parse_log  # noqa: E402
-from diagnose import DATASHEETS, MODEL, diagnose  # noqa: E402
+from diagnose import DATASHEETS, MODEL, SYSTEM, diagnose  # noqa: E402
 
 CACHE = ROOT / "cache"
+CACHE_MAX = 2000  # files; the app is public, so every distinct input must not grow the disk forever
+# Part of the cache key: a changed prompt or datasheet list must not serve old answers.
+PROMPT_ID = hashlib.sha256((SYSTEM + json.dumps(DATASHEETS, sort_keys=True)).encode()).hexdigest()[:8]
+# Per-field size caps (characters). A lab sketch is a few KB; the caps stop one request from
+# burning the free API quota or filling the disk.
+LIMITS = {"sketch": 20_000, "diagram.json": 40_000, "pin table": 4_000, "symptom": 1_500}
+LOG_HEAD, LOG_TAIL = 5_000, 25_000
 EXAMPLES = {p.name: p for p in sorted((ROOT / "examples").iterdir()) if p.is_dir()}
 LANGS = {"English": "English", "Tiếng Việt": "Vietnamese"}
 SOURCE_LABEL = {"rule": "Verified by code check", "datasheet": "Datasheet", "reasoning": "AI reasoning"}
@@ -143,8 +150,10 @@ def make_trace(sketch, diagram, mode):
     if mode == "wokwi" and diagram.strip():
         try:
             board = Diagram(diagram).board or "uno"
-        except ValueError:
+        except DiagramError:
             pass
+    if len(sketch) > LIMITS["sketch"]:
+        return "", notice_md(f"The sketch is too long (limit {LIMITS['sketch']:,} characters).")
     try:
         traced, baud = instrument(sketch, board)
     except ValueError as e:
@@ -165,21 +174,35 @@ def run(sketch, diagram, pin_table, symptom, lang, mode, serial_log=""):
         return notice("Paste diagram.json, or switch to the Real hardware tab.")
     if mode != "wokwi":
         diagram = ""
-    key = hashlib.sha256(json.dumps([sketch, diagram, pin_table, symptom, lang, MODEL] + ([serial_log] if serial_log.strip() else [])).encode()).hexdigest()[:16]
+    for name, value in zip(LIMITS, (sketch, diagram, pin_table, symptom)):
+        if len(value) > LIMITS[name]:
+            return notice(f"The {name} is too long ({len(value):,} characters, limit {LIMITS[name]:,}).")
+    if len(serial_log) > LOG_HEAD + LOG_TAIL:  # keep the start (NST|start, setup) and the latest events
+        serial_log = serial_log[:LOG_HEAD] + "\n" + serial_log[-LOG_TAIL:]
+    key = hashlib.sha256(json.dumps([sketch, diagram, pin_table, symptom, lang, MODEL, PROMPT_ID]
+                                    + ([serial_log] if serial_log.strip() else [])).encode()).hexdigest()[:16]
     cached = CACHE / f"{key}.json"
-    if cached.exists():
+    try:
         return render(json.loads(cached.read_text()))
+    except (OSError, ValueError, KeyError):  # missing or unreadable cache file: compute again
+        pass
     try:
         result = diagnose(sketch, diagram, pin_table, symptom, LANGS[lang], serial_log)
-    except ValueError as e:  # bad diagram.json
-        return notice(f"Could not read diagram.json: {e}")
-    except Exception as e:  # Gemini down or out of quota: still show what the code checks found
-        findings = (run_checks(sketch, diagram) if diagram else []) + (
-            check_trace(parse_log(serial_log), sketch) if serial_log.strip() else [])
+    except DiagramError as e:
+        return notice(str(e))
+    except Exception as e:  # every model failed: still show what the code checks and the trace found
+        try:
+            findings = (run_checks(sketch, diagram) if diagram else []) + (
+                check_trace(parse_log(serial_log), sketch) if serial_log.strip() else [])
+        except Exception:  # noqa: BLE001
+            findings = []
         return render({"rule_findings": findings},
-                      f"AI explanation unavailable right now ({type(e).__name__}). Showing code-check results only.")
+                      f"AI explanation unavailable: {str(e)[:160]}. Showing code-check results only.")
     CACHE.mkdir(exist_ok=True)
-    cached.write_text(json.dumps(result, ensure_ascii=False, indent=1))
+    if len(list(CACHE.glob("*.json"))) < CACHE_MAX:
+        tmp = cached.with_suffix(".tmp")
+        tmp.write_text(json.dumps(result, ensure_ascii=False, indent=1))
+        os.replace(tmp, cached)  # atomic: a concurrent reader never sees half a file
     return render(result)
 
 
@@ -254,5 +277,6 @@ with gr.Blocks(title="NoStackTrace") as demo:
                 [symptom, sketch, diagram, pin_table, traced, trace_help, serial_log, out])
 
 if __name__ == "__main__":
+    demo.queue(default_concurrency_limit=4, max_size=20)
     demo.launch(theme=THEME, css=CSS, footer_links=[],
                 head='<meta name="viewport" content="width=device-width, initial-scale=1">')

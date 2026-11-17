@@ -1,5 +1,6 @@
 """Code checks first, then Gemini explains and covers what the rules cannot see."""
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -80,7 +81,7 @@ def build_prompt(sketch, diagram, pin_table, symptom, serial_log=""):
     if serial_log.strip():
         events = parse_log(serial_log)
         findings += check_trace(events, sketch)
-        own = [l for l in serial_log.splitlines() if l.strip() and "NST|" not in l][-20:]
+        own = [l[:300] for l in serial_log.splitlines() if l.strip() and "NST|" not in l][-20:]
         trace = (f"\n\nRuntime trace ({len(events)} NST events; line numbers match the code above):\n{summarize(events)}"
                  + ("\n\nThe sketch's own Serial output (last lines):\n" + "\n".join(own) if own else ""))
     prompt = f"""Symptom: {symptom}
@@ -132,21 +133,40 @@ def generate(model, prompt, system=None, schema=None):
         raise Retryable(e)
 
 
-def generate_any(prompt, system=None, schema=None, models=None):
-    """Try models in order; returns (text, model)."""
-    models = models or MODELS
-    for i, model in enumerate(models):
+def generate_any(prompt, system=None, schema=None, models=None, parse=None):
+    """Try models in order; returns (text or parse(text), model).
+    Any failure (quota, bad key, 4xx, network, malformed answer) moves on to the next model;
+    when all fail, the error names each model's failure."""
+    errors = []
+    for model in models or MODELS:
         try:
-            return generate(model, prompt, system, schema), model
-        except Retryable:
-            if i == len(models) - 1:
-                raise
+            text = generate(model, prompt, system, schema)
+            return (parse(text) if parse else text), model
+        except Exception as e:  # noqa: BLE001 - every failure is logged and the next model is tried
+            logging.warning("model %s failed: %s: %s", model, type(e).__name__, str(e)[:200])
+            errors.append(f"{model}: {type(e).__name__}")
+    raise RuntimeError("all models failed (" + "; ".join(errors) + ")")
+
+
+LIKELIHOOD = {"high", "medium", "low"}
+
+
+def parse_result(text):
+    """Model JSON -> result dict with every field render() needs; raises ValueError otherwise."""
+    r = json.loads(text or "")
+    if not isinstance(r, dict) or not isinstance(r.get("summary"), str) or not isinstance(r.get("causes"), list):
+        raise ValueError("answer is missing summary/causes")
+    for c in r["causes"]:
+        if not isinstance(c, dict) or not all(isinstance(c.get(k), str) for k in SCHEMA["properties"]["causes"]["items"]["required"]):
+            raise ValueError("a cause is missing a field")
+        if c["likelihood"] not in LIKELIHOOD:
+            c["likelihood"] = "medium"
+    return r
 
 
 def diagnose(sketch, diagram="", pin_table="", symptom="", lang="English", serial_log=""):
     prompt, findings = build_prompt(sketch, diagram, pin_table, symptom, serial_log)
-    text, model = generate_any(prompt, SYSTEM.replace("{lang}", lang), SCHEMA)
-    result = json.loads(text)
+    result, model = generate_any(prompt, SYSTEM.replace("{lang}", lang), SCHEMA, parse=parse_result)
     result["rule_findings"] = findings
     result["model"] = model
     return result

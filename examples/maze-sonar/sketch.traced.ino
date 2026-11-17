@@ -62,8 +62,6 @@ static unsigned long nst_pi(int line, int pin, int state, unsigned long timeout,
 #define analogRead(p) nst_ar((p), __LINE__)
 #define pinMode(p, m) nst_pm((p), (m), __LINE__)
 #define pulseIn(...) nst_pi(__LINE__, __VA_ARGS__, 0)
-#define setup nst_user_setup
-#define loop nst_user_loop
 // ---- end of trace header ----
 
 #line 4
@@ -90,14 +88,14 @@ long lookAt(int angle) {
   return readCm();
 }
 
-void setup() {
+void nst_user_setup() {
   Serial.begin(115200);
   pinMode(TRIG, OUTPUT);
   pinMode(ECHO, INPUT);
   neck.attach(SERVO_PIN);
 }
 
-void loop() {
+void nst_user_loop() {
   long left = lookAt(150);
   long front = lookAt(90);
   long right = lookAt(30);
@@ -108,9 +106,8 @@ void loop() {
   else Serial.printf("%lu ms  TURN RIGHT\n", t);
 }
 
+
 // ---- NoStackTrace trace footer (generated) ----
-#undef setup
-#undef loop
 static unsigned long nst_loops, nst_slowest;
 void setup() {
   Serial.begin(115200);

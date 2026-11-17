@@ -60,8 +60,6 @@ static unsigned long nst_pi(int line, int pin, int state, unsigned long timeout,
 #define analogRead(p) nst_ar((p), __LINE__)
 #define pinMode(p, m) nst_pm((p), (m), __LINE__)
 #define pulseIn(...) nst_pi(__LINE__, __VA_ARGS__, 0)
-#define setup nst_user_setup
-#define loop nst_user_loop
 // ---- end of trace header ----
 
 #line 1
@@ -72,14 +70,14 @@ static unsigned long nst_pi(int line, int pin, int state, unsigned long timeout,
 
 bool lampOn = false;
 
-void setup() {
+void nst_user_setup() {
   Serial.begin(115200);
   pinMode(BUTTON, INPUT_PULLUP);
   pinMode(LAMP, OUTPUT);
   pinMode(STATUS, OUTPUT);
 }
 
-void loop() {
+void nst_user_loop() {
   digitalWrite(STATUS, HIGH);
   delay(1000);
   digitalWrite(STATUS, LOW);
@@ -92,9 +90,8 @@ void loop() {
   }
 }
 
+
 // ---- NoStackTrace trace footer (generated) ----
-#undef setup
-#undef loop
 static unsigned long nst_loops, nst_slowest;
 void setup() {
   Serial.begin(115200);

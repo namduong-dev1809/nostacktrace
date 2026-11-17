@@ -71,15 +71,11 @@ static unsigned long nst_pi(int line, int pin, int state, unsigned long timeout,
 #define analogRead(p) nst_ar((p), __LINE__)
 #define pinMode(p, m) nst_pm((p), (m), __LINE__)
 #define pulseIn(...) nst_pi(__LINE__, __VA_ARGS__, 0)
-#define setup nst_user_setup
-#define loop nst_user_loop
 // ---- end of trace header ----
 """
 
 FOOTER = r"""
 // ---- NoStackTrace trace footer (generated) ----
-#undef setup
-#undef loop
 static unsigned long nst_loops, nst_slowest;
 void setup() {
   Serial.begin(%(baud)d);
@@ -113,21 +109,64 @@ I2C_SCAN = r"""
   Serial.println();"""
 
 
+USER_FN = re.compile(r"^void(\s+)(setup|loop)(\s*\()", re.M)
+
+
+def _strip_comments(code):
+    """Blank out comments (keeping newlines) so they are not read as code; string-aware."""
+    return re.sub(r'"(?:\\.|[^"\\\n])*"|//[^\n]*|/\*.*?\*/',
+                  lambda m: m.group(0) if m.group(0)[0] == '"' else re.sub(r"[^\n]", " ", m.group(0)),
+                  code, flags=re.S)
+
+
+def _baud(code):
+    """Baud of the hardware Serial port, resolving a #define or const name; 115200 if unknown."""
+    m = re.search(r"(?<![\w.])Serial\.begin\s*\(\s*(\w+)", code)
+    if not m:
+        return 115200
+    if m.group(1).isdigit():
+        return int(m.group(1))
+    d = re.search(rf"(?:#define\s+{m.group(1)}\s+|\b{m.group(1)}\s*=\s*)(\d+)", code)
+    return int(d.group(1)) if d else 115200
+
+
+def _header_line(code):
+    """Index of the line after which the trace header goes: after the last #include,
+    and outside any #if block that contains it, so it is never skipped by the preprocessor."""
+    lines, depth, last_inc, close = code.split("\n"), 0, -1, -1
+    for i, l in enumerate(lines):
+        t = l.strip()
+        if t.startswith("#include"):
+            last_inc, close = i, i if depth == 0 else -1
+        elif re.match(r"#\s*if", t):
+            depth += 1
+        elif re.match(r"#\s*endif", t):
+            depth = max(depth - 1, 0)
+            if depth == 0 and close == -1 and last_inc >= 0:
+                close = i
+    return close if last_inc >= 0 else -1
+
+
 def instrument(sketch, board="uno"):
     """Return (traced_sketch, baud). Raises ValueError if the sketch has no setup()/loop()."""
-    if not re.search(r"\bvoid\s+setup\s*\(", sketch) or not re.search(r"\bvoid\s+loop\s*\(", sketch):
-        raise ValueError("The sketch needs both setup() and loop().")
-    m = re.search(r"Serial\.begin\s*\(\s*(\d+)", sketch)
-    baud = int(m.group(1)) if m else 115200
-    # Scan only on the default I2C pins; a custom Wire.begin(sda, scl) means the defaults are wrong.
-    scan = I2C_SCAN if "Wire.h" in sketch and not re.search(r"Wire\.begin\s*\(\s*[^)\s]", sketch) else ""
-    lines = sketch.splitlines()
-    last_include = max((i for i, l in enumerate(lines) if l.lstrip().startswith("#include")), default=-1)
+    sketch = sketch.replace("\r\n", "\n")
+    code = _strip_comments(sketch)
+    if {m.group(2) for m in USER_FN.finditer(code)} != {"setup", "loop"}:
+        raise ValueError("The sketch needs both setup() and loop(), each starting with 'void' at the start of a line.")
+    baud = _baud(code)
+    # Scan only on the default I2C pins; custom pins (Wire.begin(sda, scl), setPins, Wire1) mean the defaults are wrong.
+    scan = I2C_SCAN if "Wire.h" in code and not re.search(r"Wire\.begin\s*\(\s*[^)\s]|Wire\d?\.setPins|\bWire1\b", code) else ""
+    lines = sketch.split("\n")
+    # Rename only the student's own setup()/loop() definitions (column 0, outside comments), so
+    # library methods such as client.loop() keep their names.
+    code_lines = code.split("\n")
+    lines = [USER_FN.sub(r"void\1nst_user_\2\3", l) if USER_FN.match(c) else l for l, c in zip(lines, code_lines)]
+    cut = _header_line(code)
     # The header goes after the includes so library headers are not rewritten by the macros.
     # Its #line directive keeps __LINE__ equal to the student's original line numbers.
-    head = "\n".join(lines[:last_include + 1])
-    body = "\n".join(lines[last_include + 1:])
-    traced = (f"{head}\n#include <Arduino.h>\n{HEADER}\n#line {last_include + 2}\n{body}\n"
+    head = "\n".join(lines[:cut + 1])
+    body = "\n".join(lines[cut + 1:])
+    traced = (f"{head}\n#include <Arduino.h>\n{HEADER}\n#line {cut + 2}\n{body}\n"
               + FOOTER % {"baud": baud, "board": board, "scan": scan})
     return traced, baud
 
@@ -135,8 +174,13 @@ def instrument(sketch, board="uno"):
 LOG_LINE = re.compile(r"NST\|(.*)")
 
 
+NUMERIC = ("took_us", "loop_slowest_us", "loops", "dropped")
+NUM = re.compile(r"\d{1,12}", re.A)
+
+
 def parse_log(text):
-    """Serial output -> list of dicts, one per NST line. Other lines are the sketch's own prints."""
+    """Serial output -> list of dicts, one per NST line. Other lines are the sketch's own prints.
+    Fields whose number is cut off or garbled (wrong baud) are dropped, never kept as text."""
     events = []
     for raw in text.splitlines():
         m = LOG_LINE.search(raw)
@@ -144,17 +188,30 @@ def parse_log(text):
             continue
         ev = {}
         for part in m.group(1).split("|"):
-            if part.startswith("t=") and part[2:].isdigit():
-                ev["t_ms"] = int(part[2:])
-            elif re.fullmatch(r"L\d+", part):
+            k, _, v = part.partition("=")
+            if k == "t" and NUM.fullmatch(v):
+                ev["t_ms"] = int(v)
+            elif re.fullmatch(r"L\d{1,6}", part, re.A):
                 ev["line"] = int(part[1:])
-            elif "=" in part and part.split("=", 1)[0] in ("took_us", "loop_slowest_us", "loops", "board", "i2c_scan"):
-                k, v = part.split("=", 1)
-                ev[k] = int(v) if v.isdigit() else v.strip()
+            elif k in NUMERIC:
+                if NUM.fullmatch(v):
+                    ev[k] = int(v)
+            elif k in ("board", "i2c_scan"):
+                ev[k] = v.split("NST")[0].strip()
             else:
                 ev.setdefault("call", part)
         events.append(ev)
     return events
+
+
+def _i2c_addresses(sketch):
+    """Addresses the code itself uses for I2C devices (not every hex constant in the sketch)."""
+    pats = (r"LiquidCrystal_I2C\s+\w+\s*\(\s*(0x[0-9a-fA-F]+)",
+            r"beginTransmission\s*\(\s*(0x[0-9a-fA-F]+)",
+            r"\.begin\s*\([^)]*?(0x[0-9a-fA-F]+)",
+            r"#define\s+\w*ADDR\w*\s+(0x[0-9a-fA-F]+)",
+            r"\b\w*[Aa]ddr\w*\s*=\s*(0x[0-9a-fA-F]+)")
+    return {int(a, 16) for p in pats for a in re.findall(p, sketch)}
 
 
 def check_trace(events, sketch=""):
@@ -176,18 +233,25 @@ def check_trace(events, sketch=""):
                         fix="Look for delay() or blocking calls in loop(); use millis() timing instead."))
     scans = [e for e in events if "i2c_scan" in e]
     if scans:
-        found = {a.lower() for a in str(scans[-1]["i2c_scan"]).split()}
-        wanted = {a.lower() for a in re.findall(r"0x[0-9a-fA-F]{2}", sketch)}
+        found = {int(a, 16) for a in str(scans[-1]["i2c_scan"]).split() if re.fullmatch(r"0x[0-9a-fA-F]{1,2}", a)}
+        wanted = _i2c_addresses(sketch)
+        hx = lambda xs: ", ".join(f"0x{a:02X}" for a in sorted(xs))
         if not found:
             out.append(dict(id="trace-i2c-none", severity="high", title="No I2C device answered on the bus",
                             evidence="The I2C scan at startup found no address.",
                             fix="Check SDA/SCL wiring (Uno: A4/A5, ESP32: 21/22), power and GND to the module."))
         elif wanted and not (wanted & found):
             out.append(dict(id="trace-i2c-address", severity="high",
-                            title=f"I2C device is at {', '.join(sorted(found))}, code uses {', '.join(sorted(wanted))}",
+                            title=f"I2C device is at {hx(found)}, code uses {hx(wanted)}",
                             evidence="The startup I2C scan found a device, but not at the address in the code.",
-                            fix=f"Change the address in the code to {sorted(found)[0]}."))
-    if events and not any("setup_done" in e.get("call", "") for e in events):
+                            fix=f"Change the address in the code to {hx(sorted(found)[:1])}."))
+    dropped = sum(e.get("dropped", 0) for e in events)
+    if dropped:
+        out.append(dict(id="trace-dropped", severity="low", title=f"The trace skipped {dropped} event(s)",
+                        evidence="More than 24 traced calls happened in one loop() pass; the extra ones were not logged.",
+                        fix="Missing lines in the trace are not proof that a call did not happen."))
+    # Only when the log starts at the beginning: a pasted tail has no NST|start line.
+    if any(e.get("call") == "start" for e in events) and not any(e.get("call") == "setup_done" for e in events):
         out.append(dict(id="trace-setup-stuck", severity="high", title="setup() never finished",
                         evidence="The trace shows NST|start but no NST|setup_done.",
                         fix="A call in setup() is blocking (e.g. waiting for a sensor, Wire or Serial). Add Serial.println markers in setup() to find it."))

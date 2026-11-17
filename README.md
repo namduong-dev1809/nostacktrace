@@ -99,11 +99,17 @@ All 20 eval sketches and the example compile with `arduino-cli`, both original a
 ## Known limits
 
 - Arduino Uno and ESP32 only; about 10 common parts have datasheet facts.
-- The trace buffer holds 24 events per `loop()` pass (about 480 bytes of RAM on the Uno).
-  If `setup()` blocks forever, the buffered events before it are not printed.
+- The trace adds about 680 bytes of RAM on the Uno (a third of its 2 KB) and buffers 24 events per
+  `loop()` pass; extra events are counted and reported as skipped. If `setup()` or `loop()` blocks
+  forever, the buffered events of that pass are not printed.
+- Tracing uses macros for `digitalRead/digitalWrite/analogRead/pinMode/pulseIn`. A class method
+  with one of those names, or calling them from an interrupt handler, is not supported.
+  `setup()` and `loop()` must start with `void` at the beginning of a line.
 - The sketch's own `Serial.print` lines appear before the trace events of the same pass.
 - Free API tiers: Gemini allows about 20 requests per day per model, so the app tries several
   models and then Groq. Example results are cached in `cache/`.
+- The public demo limits input size and runs at most 4 diagnoses at once, so a heavy load shows
+  "AI explanation unavailable" with the code-check results instead.
 - AI can be wrong. Cards labelled *AI reasoning* are guesses to check, not facts.
 
 ## AI tools used, and my own work

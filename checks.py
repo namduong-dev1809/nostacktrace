@@ -36,15 +36,22 @@ def norm_pin(pin, board, board_type=""):
     return pin
 
 
+class DiagramError(ValueError):
+    """diagram.json cannot be used: not JSON, wrong shape, or no supported board."""
+
+
 class Diagram:
     def __init__(self, text):
-        d = json.loads(text)
-        self.parts = {p["id"]: p for p in d.get("parts", [])}
-        self.board_id, self.board = _board(d.get("parts", []))
-        self.board_type = self.parts[self.board_id]["type"] if self.board_id else ""
-        self._parent = {}
-        for conn in d.get("connections", []):
-            self._union(conn[0], conn[1])
+        try:
+            d = json.loads(text)
+            self.parts = {p["id"]: p for p in d.get("parts", [])}
+            self.board_id, self.board = _board(d.get("parts", []))
+            self.board_type = self.parts[self.board_id]["type"] if self.board_id else ""
+            self._parent = {}
+            for conn in d.get("connections", []):
+                self._union(conn[0], conn[1])
+        except (ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
+            raise DiagramError(f"diagram.json is not a valid Wokwi diagram ({type(e).__name__}: {e})") from e
         # Pushbutton legs on the same side are one conductor inside the part.
         for pid, p in self.parts.items():
             if p["type"] == "wokwi-pushbutton":
@@ -268,5 +275,5 @@ CHECKS = [check_input_only_pins, check_unwired_pins, check_floating_buttons, che
 def run_checks(sketch_text, diagram_text):
     dg, sk = Diagram(diagram_text), Sketch(sketch_text)
     if dg.board is None:
-        raise ValueError("diagram.json has no Arduino Uno or ESP32 board part.")
+        raise DiagramError("diagram.json has no Arduino Uno or ESP32 board part.")
     return [f for check in CHECKS for f in check(dg, sk)]

@@ -1,13 +1,13 @@
 {
- "summary": "The I2C LCD stays blank because the code uses address 0x3F, but the actual display responds at address 0x27.",
+ "summary": "The LCD remains blank because the I2C address defined in your code does not match the actual hardware address of the LCD module.",
  "causes": [
   {
-   "title": "I2C device is at 0x27, code uses 0x3f",
+   "title": "I2C address mismatch",
    "category": "code",
    "likelihood": "high",
-   "why": "LiquidCrystal_I2C lcd(0x3F, 16, 2); uses 0x3F, but the startup I2C scan found the device at 0x27.",
-   "check": "Verify the address printed during an I2C scan or look closely at the PCF8574 chip backpack on the back of the LCD.",
-   "fix": "Change the constructor in the code to LiquidCrystal_I2C lcd(0x27, 16, 2);.",
+   "why": "The code initializes the LCD with address 0x3F (`LiquidCrystal_I2C lcd(0x3F, 16, 2);`), but the runtime trace confirms the device is responding at 0x27 (`NST|i2c_scan=0x27`).",
+   "check": "Run an I2C scanner sketch to confirm the address of your specific LCD module.",
+   "fix": "Change the address in your code to `LiquidCrystal_I2C lcd(0x27, 16, 2);`.",
    "source": "rule:trace-i2c-address"
   }
  ],
@@ -22,10 +22,10 @@
   {
    "id": "trace-i2c-address",
    "severity": "high",
-   "title": "I2C device is at 0x27, code uses 0x3f",
+   "title": "I2C device is at 0x27, code uses 0x3F",
    "evidence": "The startup I2C scan found a device, but not at the address in the code.",
    "fix": "Change the address in the code to 0x27."
   }
  ],
- "model": "gemini-3.5-flash-lite"
+ "model": "gemini-3.1-flash-lite"
 }

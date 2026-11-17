@@ -62,8 +62,6 @@ static unsigned long nst_pi(int line, int pin, int state, unsigned long timeout,
 #define analogRead(p) nst_ar((p), __LINE__)
 #define pinMode(p, m) nst_pm((p), (m), __LINE__)
 #define pulseIn(...) nst_pi(__LINE__, __VA_ARGS__, 0)
-#define setup nst_user_setup
-#define loop nst_user_loop
 // ---- end of trace header ----
 
 #line 4
@@ -71,22 +69,21 @@ static unsigned long nst_pi(int line, int pin, int state, unsigned long timeout,
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
 int count = 0;
 
-void setup() {
+void nst_user_setup() {
   Serial.begin(115200);
   lcd.init();
   lcd.backlight();
   lcd.print("Hello lab!");
 }
 
-void loop() {
+void nst_user_loop() {
   lcd.setCursor(0, 1);
   lcd.print(count++);
   delay(500);
 }
 
+
 // ---- NoStackTrace trace footer (generated) ----
-#undef setup
-#undef loop
 static unsigned long nst_loops, nst_slowest;
 void setup() {
   Serial.begin(115200);
