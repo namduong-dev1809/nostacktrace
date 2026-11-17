@@ -182,8 +182,9 @@ def run(sketch, diagram, pin_table, symptom, lang, mode, serial_log=""):
             return notice(f"The {name} is too long ({len(value):,} characters, limit {LIMITS[name]:,}).")
     if len(serial_log) > LOG_HEAD + LOG_TAIL:  # keep the start (NST|start, setup) and the latest events
         serial_log = serial_log[:LOG_HEAD] + "\n" + serial_log[-LOG_TAIL:]
-    key = hashlib.sha256(json.dumps([sketch, diagram, pin_table, symptom, lang, MODEL, PROMPT_ID]
-                                    + ([serial_log] if serial_log.strip() else [])).encode()).hexdigest()[:16]
+    # rstrip: the code boxes drop a trailing newline, so file text and pasted text must hash alike.
+    key = hashlib.sha256(json.dumps([x.rstrip() for x in (sketch, diagram, pin_table, symptom)] + [lang, MODEL, PROMPT_ID]
+                                    + ([serial_log.rstrip()] if serial_log.strip() else [])).encode()).hexdigest()[:16]
     cached = CACHE / f"{key}.json"
     try:
         return render(json.loads(cached.read_text()))

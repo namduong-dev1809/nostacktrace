@@ -46,6 +46,13 @@ class TestRun(unittest.TestCase):
         self.assertIn("ok", app.run(SKETCH, DIAGRAM, None, "it freezes", "English", "wokwi", None))
         self.assertIn("Paste your code", app.make_trace(None, None, "wokwi")[1])
 
+    def test_trailing_newline_hits_same_cache(self):
+        calls = []
+        app.diagnose = lambda *a: calls.append(1) or {"summary": "ok", "causes": [], "rule_findings": [], "model": "m"}
+        app.run(SKETCH + "\n", DIAGRAM + "\n", "", "it freezes", "English", "wokwi", "")
+        app.run(SKETCH.rstrip(), DIAGRAM.rstrip(), "", "it freezes", "English", "wokwi", "")
+        self.assertEqual(len(calls), 1)
+
     def test_input_too_long(self):
         self.assertIn("too long", app.run("x" * 30_000, DIAGRAM, "", "s", "English", "wokwi"))
 

@@ -1,13 +1,13 @@
 {
- "summary": "The robot freezes and crashes because pulseIn() has no timeout when the ultrasonic sensor fails to receive an echo in a long corridor, blocking the loop for a full second per reading.",
+ "summary": "In a long corridor, the HC-SR04 ultrasonic sensor fails to receive an echo within range, causing pulseIn() to block for its default 1-second timeout per reading. Since lookAt() performs three readings per loop iteration, this freezes the loop for about 3 seconds, pausing the Serial log and causing the robot to crash into the wall.",
  "causes": [
   {
-   "title": "pulseIn() lacks a timeout, causing 1-second freezes",
+   "title": "pulseIn() blocks the loop for 1 second when no echo returns",
    "category": "timing",
    "likelihood": "high",
-   "why": "Trace: pulseIn(18)=0 took 1000018 us (15 slow call(s) logged).",
-   "check": "Verify that when the sonar points down a long corridor (no echo), the Serial log pauses for exactly one second.",
-   "fix": "Pass a timeout argument to pulseIn, e.g., pulseIn(ECHO, HIGH, 30000).",
+   "why": "Trace: pulseIn(18)=0 took 1000022 us (15 slow call(s) logged) at line 17.",
+   "check": "Look at the Serial monitor when the robot enters a long corridor; notice that the timestamps freeze for about 3 seconds per loop.",
+   "fix": "Pass a timeout argument to pulseIn(), such as pulseIn(ECHO, HIGH, 30000), to limit the wait time to ~30 ms.",
    "source": "rule:trace-pulsein-timeout"
   }
  ],
